@@ -2,13 +2,24 @@ import React, { useState, useMemo } from 'react';
 import { SearchIcon, FilterIcon, ChevronDownIcon, CheckCircleIcon, Loader2Icon, BriefcaseIcon, CalendarIcon, UserIcon } from '../components/Icons';
 import { ACADEMIC_YEARS } from '../utils';
 
-export default function BulkEditView({ db, employees, settings, addToast }) {
+// 1. Add setConfirmDialog to props
+export default function BulkEditView({ db, employees, settings, addToast, setConfirmDialog }) {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [filterClass, setFilterClass] = useState('');
     const [filterYear, setFilterYear] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [isApplying, setIsApplying] = useState(false);
     const [updateData, setUpdateData] = useState({ group: '', section: '', position: '', academicYear: '', mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' });
+
+    const uniqueClasses = useMemo(() => {
+        const classes = employees.map(emp => emp.class).filter(c => c && c.trim() !== '');
+        return [...new Set(classes)].sort();
+    }, [employees]);
+
+    const uniqueYears = useMemo(() => {
+        const years = employees.map(emp => emp.academicYear).filter(y => y && y.trim() !== '');
+        return [...new Set(years)].sort();
+    }, [employees]);
 
     const filteredEmployees = useMemo(() => {
         return employees.filter(emp => {
@@ -17,6 +28,7 @@ export default function BulkEditView({ db, employees, settings, addToast }) {
             const isNumericId = /^\d+$/.test(emp.studentId || '');
             const term = searchTerm.toLowerCase();
             const matchSearch = (emp.name || '').toLowerCase().includes(term) || (emp.latinName || '').toLowerCase().includes(term) || (emp.studentId || '').toLowerCase().includes(term);
+            
             return matchClass && matchYear && isNumericId && matchSearch;
         });
     }, [employees, filterClass, filterYear, searchTerm]);
@@ -39,18 +51,23 @@ export default function BulkEditView({ db, employees, settings, addToast }) {
 
     const handleUpdateChange = (field, value) => setUpdateData(prev => ({ ...prev, [field]: value }));
 
-    const applyBulkUpdate = async () => {
-        if (selectedIds.size === 0) return;
-        if (!confirm(`តើអ្នកចង់កែប្រែទិន្នន័យសម្រាប់បុគ្គលិក ${selectedIds.size} នាក់ដែលបានជ្រើសរើសមែនទេ?`)) return;
+    // 2. This is the logic that runs ONLY after confirmation
+    const executeBulkUpdate = async () => {
         setIsApplying(true);
+        // Close the modal immediately so we can show loading state in button
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+
         const updates = {};
         const fieldsToUpdate = {};
+        
         if(updateData.group) fieldsToUpdate['ក្រុម'] = updateData.group;
         if(updateData.section) fieldsToUpdate['ផ្នែកការងារ'] = updateData.section;
         if(updateData.position) fieldsToUpdate['តួនាទី'] = updateData.position;
         if(updateData.academicYear) fieldsToUpdate['ឆ្នាំសិក្សា'] = updateData.academicYear;
+        
         const scheduleFields = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
         const khmerDays = ['ចន្ទ', 'អង្គារ៍', 'ពុធ', 'ព្រហស្បត្តិ៍', 'សុក្រ', 'សៅរ៍', 'អាទិត្យ'];
+        
         selectedIds.forEach(id => {
             Object.keys(fieldsToUpdate).forEach(key => { updates[`students/${id}/${key}`] = fieldsToUpdate[key]; });
             scheduleFields.forEach((day, idx) => { if(updateData[day]) { updates[`students/${id}/កាលវិភាគ/${khmerDays[idx]}`] = updateData[day]; } });
@@ -59,11 +76,41 @@ export default function BulkEditView({ db, employees, settings, addToast }) {
         try {
             if (Object.keys(updates).length > 0) {
                 await db.ref().update(updates);
-                addToast(`បានកែប្រែទិន្នន័យជោគជ័យសម្រាប់ ${selectedIds.size} នាក់`);
+                addToast(`បានកែប្រែទិន្នន័យជោគជ័យសម្រាប់ ${selectedIds.size} នាក់`, 'success');
                 setSelectedIds(new Set());
                 setUpdateData({ group: '', section: '', position: '', academicYear: '', mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' });
-            } else { addToast("សូមជ្រើសរើសទិន្នន័យដែលត្រូវកែប្រែ", "error"); }
-        } catch (error) { console.error(error); addToast("បរាជ័យក្នុងការកែប្រែ", "error"); } finally { setIsApplying(false); }
+            } else { 
+                addToast("សូមជ្រើសរើសទិន្នន័យដែលត្រូវកែប្រែ", "warning"); 
+            }
+        } catch (error) { 
+            console.error(error); 
+            addToast("បរាជ័យក្នុងការកែប្រែ", "error"); 
+        } finally { 
+            setIsApplying(false); 
+        }
+    };
+
+    // 3. This triggers the Custom Modal
+    const handleApplyClick = () => {
+        if (selectedIds.size === 0) {
+            addToast("សូមជ្រើសរើសបុគ្គលិកជាមុនសិន", "warning");
+            return;
+        }
+
+        // Check if any fields are actually selected for update
+        const hasFields = Object.values(updateData).some(val => val !== '');
+        if (!hasFields) {
+            addToast("សូមជ្រើសរើសព័ត៌មានដែលត្រូវកែប្រែ", "warning");
+            return;
+        }
+
+        setConfirmDialog({
+            isOpen: true,
+            type: 'warning', // Uses the yellow/orange styling for caution
+            title: 'បញ្ជាក់ការកែប្រែ', // Confirm Update
+            message: `តើអ្នកចង់កែប្រែទិន្នន័យសម្រាប់បុគ្គលិកចំនួន ${selectedIds.size} នាក់ដែលបានជ្រើសរើសមែនទេ?`,
+            onConfirm: executeBulkUpdate // Pass the function to run on Yes
+        });
     };
 
     const renderSelect = (label, name, options, placeholder = "មិនកែប្រែ") => (
@@ -87,10 +134,17 @@ export default function BulkEditView({ db, employees, settings, addToast }) {
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><SearchIcon className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
                         <input type="text" className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 transition-all placeholder:text-slate-400" placeholder="ស្វែងរក..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
+                    
                     <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
                         <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50/50 rounded-xl border border-indigo-100"><FilterIcon className="h-4 w-4 text-indigo-500" /><span className="text-xs font-bold text-indigo-600">Filter:</span></div>
-                        <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]"><option value="">គ្រប់ថ្នាក់</option>{settings?.classes?.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                        <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]"><option value="">គ្រប់ឆ្នាំសិក្សា</option>{ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                        <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
+                            <option value="">គ្រប់ថ្នាក់</option>
+                            {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
+                            <option value="">គ្រប់ឆ្នាំសិក្សា</option>
+                            {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
                     </div>
                 </div>
                 <div className="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200">Total Found: <span className="text-indigo-600 text-sm">{filteredEmployees.length}</span></div>
@@ -131,7 +185,7 @@ export default function BulkEditView({ db, employees, settings, addToast }) {
                             {renderSelect('ក្រុម', 'group', settings?.groups)}
                             {renderSelect('ផ្នែក', 'section', settings?.sections)}
                             {renderSelect('តួនាទី', 'position', settings?.positions)}
-                            {renderSelect('ឆ្នាំសិក្សា', 'academicYear', ACADEMIC_YEARS)}
+                            {renderSelect('ឆ្នាំសិក្សា', 'academicYear', ACADEMIC_YEARS)} 
                         </div>
                         <div className="flex gap-3">
                             <div className="flex items-center gap-2 text-orange-500 font-bold text-xs whitespace-nowrap"><CalendarIcon className="h-4 w-4" /> កាលវិភាគ:</div>
@@ -148,7 +202,8 @@ export default function BulkEditView({ db, employees, settings, addToast }) {
                     </div>
                 </div>
                 <div className="p-4 border-t border-slate-100 bg-white/50 flex justify-end">
-                    <button onClick={applyBulkUpdate} disabled={isApplying} className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 disabled:opacity-50 transition-all active:scale-95">{isApplying ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <CheckCircleIcon className="h-4 w-4" />} រក្សាទុកការកែប្រែ</button>
+                    {/* 4. Update the button to use the new handleApplyClick */}
+                    <button onClick={handleApplyClick} disabled={isApplying} className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 disabled:opacity-50 transition-all active:scale-95">{isApplying ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <CheckCircleIcon className="h-4 w-4" />} រក្សាទុកការកែប្រែ</button>
                 </div>
             </div>
         </div>

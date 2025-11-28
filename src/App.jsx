@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
-import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom'; // <--- Import Router tools
+// REMOVED "BrowserRouter as Router" because you are using HashRouter in main.jsx
+import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { db, auth } from './firebase';
 import { DatabaseIcon, LayoutGridIcon, UsersIcon, CheckSquareIcon, Trash2Icon, SettingsIcon, LogOutIcon, MenuIcon, BellIcon, SearchIcon, PlusIcon, ListIcon, Edit2Icon, UserIcon, SendIcon, ChevronLeftIcon, ChevronRightIcon, RotateCcwIcon } from './components/Icons';
 import { ToastContainer, ConfirmModal, EditableCell } from './components/UI';
@@ -21,7 +22,8 @@ const useToast = () => {
     return { toasts, addToast, removeToast };
 };
 
-// --- SUB-COMPONENTS (Keep them same as before) ---
+// --- SUB-COMPONENTS (Card, Row, TrashRow) ---
+// ... (These remain exactly the same as before) ...
 const EmployeeCard = memo(({ employee, onEdit, onDelete, index }) => (
     <div className="group bg-white/70 backdrop-blur-md rounded-3xl border border-white/60 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-2 transition-all duration-300 overflow-hidden flex flex-col animate-fade-in" style={{ animationDelay: `${index * 50}ms` }} onDoubleClick={onEdit}>
         <div className="p-6 flex flex-col items-center text-center relative">
@@ -122,18 +124,26 @@ const TrashRow = memo(({ employee, onRestore, onPermanentDelete, index }) => (
     </tr>
 ));
 
-// --- INTERNAL COMPONENT: Employee List ---
-// Separation: I moved the complex list rendering here to clean up the main Router logic
-const EmployeeList = ({ 
-    employees, loading, searchTerm, setSearchTerm, viewMode, setViewMode, 
-    setCurrentEmployee, setIsModalOpen, initiateDelete, handleRestore, handlePermanentDelete, 
-    handleInlineUpdate, settings, activeTab 
+// --- NEW COMPONENT: Encapsulated Employee List View ---
+const EmployeeListView = ({ 
+    employees, 
+    loading, 
+    settings,
+    isRecycleBin = false, 
+    onEdit, 
+    onDelete, 
+    onRestore, 
+    onPermanentDelete, 
+    onInlineUpdate, 
+    onCreate 
 }) => {
+    const [viewMode, setViewMode] = useState('list');
+    const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 50;
-    const isMobile = window.innerWidth < 768;
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     
-    // Drag scroll ref
+    // Table Dragging Refs
     const tableContainerRef = useRef(null);
     const isDragging = useRef(false);
     const startX = useRef(0);
@@ -144,11 +154,18 @@ const EmployeeList = ({
     const onMouseUp = () => { isDragging.current = false; if(tableContainerRef.current) tableContainerRef.current.classList.remove('cursor-grabbing'); };
     const onMouseMove = (e) => { if (!isDragging.current) return; e.preventDefault(); if(tableContainerRef.current) { const x = e.pageX - tableContainerRef.current.offsetLeft; const walk = (x - startX.current) * 2; tableContainerRef.current.scrollLeft = scrollLeft.current - walk; } };
 
+    useEffect(() => { 
+        const handleResize = () => setIsMobile(window.innerWidth < 768); 
+        window.addEventListener('resize', handleResize); 
+        return () => window.removeEventListener('resize', handleResize); 
+    }, []);
+
     const filteredEmployees = useMemo(() => {
         const term = (searchTerm || '').toLowerCase();
         return employees.filter(emp => (emp.name || '').toLowerCase().includes(term) || (emp.latinName || '').toLowerCase().includes(term) || (emp.studentId || '').toLowerCase().includes(term));
     }, [employees, searchTerm]);
 
+    // Reset page on search
     useEffect(() => setCurrentPage(1), [searchTerm]);
 
     const currentItems = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -163,13 +180,13 @@ const EmployeeList = ({
                     <input type="text" className="block w-full pl-12 pr-4 py-3 border-none rounded-2xl bg-white/50 focus:bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ស្វែងរក..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
                 <div className="flex items-center gap-3 w-full md:w-auto">
-                    {activeTab === 'employees' && (
+                    {!isRecycleBin && (
                         <>
                         <div className="bg-white/50 p-1.5 rounded-xl hidden md:flex items-center ring-1 ring-slate-200">
                             <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
                             <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
                         </div>
-                        <button onClick={() => { setCurrentEmployee(null); setIsModalOpen(true); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span>បង្កើតថ្មី</span></button>
+                        <button onClick={onCreate} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span>បង្កើតថ្មី</span></button>
                         </>
                     )}
                 </div>
@@ -179,14 +196,14 @@ const EmployeeList = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">{[1, 2, 3].map(i => <div key={i} className="bg-white/50 h-64 rounded-3xl"></div>)}</div>
             ) : filteredEmployees.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 bg-white/40 rounded-3xl border-2 border-dashed border-slate-300">
-                    <div className="bg-slate-100 p-6 rounded-full mb-4 text-slate-400">{activeTab === 'recycle_bin' ? <Trash2Icon className="h-10 w-10" /> : <SearchIcon className="h-10 w-10" />}</div>
+                    <div className="bg-slate-100 p-6 rounded-full mb-4 text-slate-400">{isRecycleBin ? <Trash2Icon className="h-10 w-10" /> : <SearchIcon className="h-10 w-10" />}</div>
                     <h3 className="text-xl font-bold text-slate-700">មិនមានទិន្នន័យ</h3>
                 </div>
             ) : (
                 <>
-                    {((viewMode === 'grid' || isMobile) && activeTab === 'employees') ? (
+                    {((viewMode === 'grid' || isMobile) && !isRecycleBin) ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-                            {currentItems.map((emp, idx) => <EmployeeCard key={emp.id} employee={emp} onEdit={() => { setCurrentEmployee(emp); setIsModalOpen(true); }} onDelete={() => initiateDelete(emp.id)} index={idx} />)}
+                            {currentItems.map((emp, idx) => <EmployeeCard key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} index={idx} />)}
                         </div>
                     ) : (
                         <div className="glass-panel rounded-3xl overflow-hidden pb-4 bg-white/80">
@@ -197,7 +214,7 @@ const EmployeeList = ({
                                             <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">Action</th>
                                             <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-[88px] bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">Profile</th>
                                             <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[140px]">Latin Name</th>
-                                            {activeTab === 'recycle_bin' ? (<><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">ID</th><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th></>) : (
+                                            {isRecycleBin ? (<><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">ID</th><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th></>) : (
                                                 <>
                                                     <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[100px]">Gender</th>
                                                     <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[120px]">ID</th>
@@ -215,7 +232,10 @@ const EmployeeList = ({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {currentItems.map((emp, idx) => activeTab === 'recycle_bin' ? <TrashRow key={emp.id} employee={emp} onRestore={handleRestore} onPermanentDelete={handlePermanentDelete} index={idx} /> : <EmployeeRow key={emp.id} employee={emp} onEdit={() => { setCurrentEmployee(emp); setIsModalOpen(true); }} onDelete={() => initiateDelete(emp.id)} onInlineUpdate={handleInlineUpdate} index={idx} settings={settings} />)}
+                                        {currentItems.map((emp, idx) => isRecycleBin ? 
+                                            <TrashRow key={emp.id} employee={emp} onRestore={onRestore} onPermanentDelete={onPermanentDelete} index={idx} /> : 
+                                            <EmployeeRow key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} onInlineUpdate={onInlineUpdate} index={idx} settings={settings} />
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -235,6 +255,7 @@ const EmployeeList = ({
     );
 };
 
+// --- MAIN APP COMPONENT ---
 function App() {
     const [user, setUser] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -242,17 +263,14 @@ function App() {
     const [deletedEmployees, setDeletedEmployees] = useState([]);
     const [settings, setSettings] = useState({});
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState('list');
-    const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentEmployee, setCurrentEmployee] = useState(null);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
-    
     const { toasts, addToast, removeToast } = useToast();
-    const location = useLocation(); // Hook to get current route
 
-    // --- FIREBASE DATA SYNC ---
+    // Firebase Data Fetching
     useEffect(() => { const unsubscribe = auth.onAuthStateChanged((u) => setUser(u)); auth.signInAnonymously().catch((error) => { console.error("Sign in failed:", error); addToast("បរាជ័យក្នុងការ Sign In", 'error'); }); return () => unsubscribe(); }, []);
+    
     useEffect(() => {
         if (!user) return;
         const dbRef = db.ref('students');
@@ -279,7 +297,7 @@ function App() {
 
     const stats = useMemo(() => ({ total: employees.length, male: employees.filter(e => e.gender === 'ប្រុស').length, female: employees.filter(e => e.gender === 'ស្រី').length }), [employees]);
 
-    // --- ACTIONS ---
+    // Data Handlers
     const initiateDelete = useCallback((id) => {
         const emp = employees.find(e => e.id === id);
         setConfirmDialog({ isOpen: true, type: 'danger', title: 'បញ្ជាក់ការលុប', message: `តើអ្នកពិតជាចង់លុប "${emp?.name}" ទៅកាន់ធុងសំរាមមែនទេ?`, onConfirm: async () => { try { await db.ref(`deleted_students/${emp.id}`).set({ ...emp.originalData, deletedAt: Date.now() }); await db.ref(`students/${emp.id}`).remove(); setConfirmDialog(prev => ({...prev, isOpen: false})); addToast("បានបញ្ជូនទៅធុងសំរាម", 'success'); } catch (error) { addToast("បរាជ័យក្នុងការលុប", 'error'); } } });
@@ -295,115 +313,106 @@ function App() {
 
     const handleInlineUpdate = useCallback(async (id, field, value) => { try { await db.ref(`students/${id}`).update({ [field]: value }); } catch (error) { addToast("បរាជ័យក្នុងការកែប្រែ", 'error'); } }, []);
 
-    // --- HELPER FOR SIDEBAR ---
-    const NavItem = ({ to, icon: Icon, label }) => {
-        const isActive = location.pathname === to;
+    // Helper Component for Sidebar and Header (Needs access to location)
+    const MainLayout = () => {
+        const location = useLocation();
+        const navigate = useNavigate();
+
+        const getTitle = () => {
+            switch(location.pathname) {
+                case '/': return 'Dashboard Overview';
+                case '/employees': return 'Employee Management';
+                case '/recycle-bin': return 'Recycle Bin';
+                case '/settings': return 'System Settings';
+                case '/bulk-edit': return 'Bulk Edit Mode';
+                default: return 'HR Pro';
+            }
+        };
+
+        const navLinkClass = (path) => `w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold ${location.pathname === path ? 'active-nav-item shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`;
+
         return (
-            <Link to={to} onClick={() => setSidebarOpen(false)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold ${isActive ? 'active-nav-item shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
-                <Icon className="h-5 w-5" /> {label}
-            </Link>
+            <div className="flex h-screen overflow-hidden">
+                <aside className={`fixed inset-y-4 left-4 z-50 w-72 glass-sidebar rounded-3xl transform transition-transform duration-500 ease-in-out md:relative md:translate-x-0 md:inset-y-0 md:left-0 md:rounded-none md:border-r md:bg-slate-900 ${sidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'} flex flex-col shadow-2xl`}>
+                    <div className="h-24 flex items-center justify-center border-b border-white/5">
+                        <div className="flex items-center gap-3 font-extrabold text-2xl tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400"><DatabaseIcon className="h-8 w-8 text-blue-500" /> HR PRO</div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto py-8 px-4 space-y-2">
+                        <p className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Menu</p>
+                        <NavLink to="/" onClick={() => setSidebarOpen(false)} className={({isActive}) => `w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold ${isActive ? 'active-nav-item shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><LayoutGridIcon className="h-5 w-5" /> ផ្ទាំងគ្រប់គ្រង</NavLink>
+                        <NavLink to="/employees" onClick={() => setSidebarOpen(false)} className={({isActive}) => `w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold ${isActive ? 'active-nav-item shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><UsersIcon className="h-5 w-5" /> បុគ្គលិក</NavLink>
+                        <NavLink to="/bulk-edit" onClick={() => setSidebarOpen(false)} className={({isActive}) => `w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold ${isActive ? 'active-nav-item shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><CheckSquareIcon className="h-5 w-5" /> កែប្រែទិន្នន័យ</NavLink>
+                        <NavLink to="/recycle-bin" onClick={() => setSidebarOpen(false)} className={({isActive}) => `w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold ${isActive ? 'bg-red-500/10 text-red-400 border-l-4 border-red-500' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><Trash2Icon className="h-5 w-5" /> ធុងសំរាម</NavLink>
+                        <div className="my-6 border-t border-white/5"></div>
+                        <p className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">System</p>
+                        <NavLink to="/settings" onClick={() => setSidebarOpen(false)} className={({isActive}) => `w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold ${isActive ? 'active-nav-item shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><SettingsIcon className="h-5 w-5" /> ការកំណត់</NavLink>
+                    </div>
+                    <div className="p-6">
+                        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-4 text-center">
+                            <p className="text-white text-xs font-medium opacity-80 mb-2">Logged in as Admin</p>
+                            <button className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-all text-sm font-bold backdrop-blur-sm"><LogOutIcon className="h-4 w-4" /> Sign Out</button>
+                        </div>
+                    </div>
+                </aside>
+
+                {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setSidebarOpen(false)}></div>}
+
+                <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                    <header className="h-20 glass-panel border-b-0 m-4 rounded-3xl flex items-center justify-between px-8 z-30 shrink-0 sticky top-4">
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600"><MenuIcon className="h-6 w-6" /></button>
+                            <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-700 to-slate-500 hidden sm:block">
+                                {getTitle()}
+                            </h1>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <div className="relative"><BellIcon className="h-6 w-6 text-slate-400 hover:text-indigo-500 transition-colors cursor-pointer" /><span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-white"></span></div>
+                            <div className="h-8 w-[1px] bg-slate-200"></div>
+                            <div className="flex items-center gap-3"><div className="text-right hidden md:block"><div className="text-sm font-bold text-slate-700">Admin User</div><div className="text-xs text-slate-400 font-medium">Super Admin</div></div><div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white">A</div></div>
+                        </div>
+                    </header>
+
+                    <main className="flex-1 overflow-y-auto px-4 pb-4 md:px-8 md:pb-8 custom-scrollbar">
+                        <Routes>
+                            <Route path="/" element={<Dashboard stats={stats} onNavigate={(path) => navigate(path)} />} />
+                            <Route path="/employees" element={
+                                <EmployeeListView 
+                                    employees={employees} 
+                                    loading={loading}
+                                    settings={settings}
+                                    onEdit={(emp) => { setCurrentEmployee(emp); setIsModalOpen(true); }}
+                                    onDelete={initiateDelete}
+                                    onInlineUpdate={handleInlineUpdate}
+                                    onCreate={() => { setCurrentEmployee(null); setIsModalOpen(true); }}
+                                />
+                            } />
+                            <Route path="/recycle-bin" element={
+                                <EmployeeListView 
+                                    employees={deletedEmployees}
+                                    loading={loading}
+                                    isRecycleBin={true}
+                                    onRestore={handleRestore}
+                                    onPermanentDelete={handlePermanentDelete}
+                                />
+                            } />
+
+                            <Route path="/bulk-edit" element={<BulkEditView db={db} employees={employees} settings={settings} addToast={addToast} setConfirmDialog={setConfirmDialog}  />} />
+                            <Route path="/settings" element={<SettingsView db={db} settings={settings} setConfirmDialog={setConfirmDialog} addToast={addToast} />} />
+                        </Routes>
+                    </main>
+                </div>
+            </div>
         );
-    };
+    }
 
     return (
-        <div className="flex h-screen overflow-hidden">
-            {/* Sidebar */}
-            <aside className={`fixed inset-y-4 left-4 z-50 w-72 glass-sidebar rounded-3xl transform transition-transform duration-500 ease-in-out md:relative md:translate-x-0 md:inset-y-0 md:left-0 md:rounded-none md:border-r md:bg-slate-900 ${sidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'} flex flex-col shadow-2xl`}>
-                <div className="h-24 flex items-center justify-center border-b border-white/5">
-                    <div className="flex items-center gap-3 font-extrabold text-2xl tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400"><DatabaseIcon className="h-8 w-8 text-blue-500" /> HR PRO</div>
-                </div>
-                <div className="flex-1 overflow-y-auto py-8 px-4 space-y-2">
-                    <p className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Menu</p>
-                    <NavItem to="/" icon={LayoutGridIcon} label="ផ្ទាំងគ្រប់គ្រង" />
-                    <NavItem to="/employees" icon={UsersIcon} label="បុគ្គលិក" />
-                    <NavItem to="/bulk-edit" icon={CheckSquareIcon} label="កែប្រែទិន្នន័យ" />
-                    
-                    <Link to="/recycle-bin" onClick={() => setSidebarOpen(false)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold ${location.pathname === '/recycle-bin' ? 'bg-red-500/10 text-red-400 border-l-4 border-red-500' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
-                        <Trash2Icon className="h-5 w-5" /> ធុងសំរាម
-                    </Link>
-
-                    <div className="my-6 border-t border-white/5"></div>
-                    <p className="px-4 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">System</p>
-                    <NavItem to="/settings" icon={SettingsIcon} label="ការកំណត់" />
-                </div>
-                <div className="p-6">
-                    <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-4 text-center">
-                        <p className="text-white text-xs font-medium opacity-80 mb-2">Logged in as Admin</p>
-                        <button className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-all text-sm font-bold backdrop-blur-sm"><LogOutIcon className="h-4 w-4" /> Sign Out</button>
-                    </div>
-                </div>
-            </aside>
-
-            {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setSidebarOpen(false)}></div>}
-
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                <header className="h-20 glass-panel border-b-0 m-4 rounded-3xl flex items-center justify-between px-8 z-30 shrink-0 sticky top-4">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600"><MenuIcon className="h-6 w-6" /></button>
-                        <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-700 to-slate-500 hidden sm:block">
-                            {location.pathname === '/' && 'Dashboard Overview'}
-                            {location.pathname === '/employees' && 'Employee Management'}
-                            {location.pathname === '/recycle-bin' && 'Recycle Bin'}
-                            {location.pathname === '/settings' && 'System Settings'}
-                            {location.pathname === '/bulk-edit' && 'Bulk Edit Mode'}
-                        </h1>
-                    </div>
-                    <div className="flex items-center gap-6">
-                        <div className="relative"><BellIcon className="h-6 w-6 text-slate-400 hover:text-indigo-500 transition-colors cursor-pointer" /><span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-white"></span></div>
-                        <div className="h-8 w-[1px] bg-slate-200"></div>
-                        <div className="flex items-center gap-3"><div className="text-right hidden md:block"><div className="text-sm font-bold text-slate-700">Admin User</div><div className="text-xs text-slate-400 font-medium">Super Admin</div></div><div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white">A</div></div>
-                    </div>
-                </header>
-
-                <main className="flex-1 overflow-y-auto px-4 pb-4 md:px-8 md:pb-8 custom-scrollbar">
-                    <Routes>
-                        <Route path="/" element={<Dashboard stats={stats} onNavigate={(path) => { /* Helper for dashboard btn */ }} />} />
-                        <Route path="/employees" element={
-                            <EmployeeList 
-                                activeTab="employees"
-                                employees={employees} 
-                                loading={loading} 
-                                searchTerm={searchTerm} 
-                                setSearchTerm={setSearchTerm} 
-                                viewMode={viewMode} 
-                                setViewMode={setViewMode} 
-                                setCurrentEmployee={setCurrentEmployee} 
-                                setIsModalOpen={setIsModalOpen} 
-                                initiateDelete={initiateDelete} 
-                                handleInlineUpdate={handleInlineUpdate} 
-                                settings={settings} 
-                            />
-                        } />
-                        <Route path="/recycle-bin" element={
-                            <EmployeeList 
-                                activeTab="recycle_bin"
-                                employees={deletedEmployees} 
-                                loading={false} 
-                                searchTerm={searchTerm} 
-                                setSearchTerm={setSearchTerm} 
-                                viewMode="list" 
-                                setViewMode={() => {}} 
-                                setCurrentEmployee={() => {}} 
-                                setIsModalOpen={() => {}} 
-                                initiateDelete={() => {}} // No delete in recycle bin except permanent
-                                handleRestore={handleRestore}
-                                handlePermanentDelete={handlePermanentDelete}
-                                handleInlineUpdate={() => {}} 
-                                settings={settings} 
-                            />
-                        } />
-                        <Route path="/bulk-edit" element={<BulkEditView db={db} employees={employees} settings={settings} addToast={addToast} />} />
-                        <Route path="/settings" element={<SettingsView db={db} settings={settings} setConfirmDialog={setConfirmDialog} addToast={addToast} />} />
-                        <Route path="*" element={<Navigate to="/" />} />
-                    </Routes>
-                </main>
-            </div>
-
+        // REMOVED <Router> here because it is provided by main.jsx
+        <>
+            <MainLayout />
             {isModalOpen && <EmployeeFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} employee={currentEmployee} db={db} addToast={addToast} settings={settings} />}
             <ConfirmModal isOpen={confirmDialog.isOpen} onClose={() => setConfirmDialog(prev => ({...prev, isOpen: false}))} {...confirmDialog} />
             <ToastContainer toasts={toasts} removeToast={removeToast} />
-        </div>
+        </>
     );
 }
 

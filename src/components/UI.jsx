@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { CheckCircleIcon, AlertCircleIcon, XIcon, AlertTriangleIcon, RotateCcwIcon } from './Icons';
 
+// --- TOAST NOTIFICATIONS ---
 export const ToastContainer = ({ toasts, removeToast }) => (
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
         {toasts.map(t => (
@@ -13,41 +14,96 @@ export const ToastContainer = ({ toasts, removeToast }) => (
     </div>
 );
 
+// --- FIXED EDITABLE CELL ---
 export const EditableCell = memo(({ value, onSave, className, options }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [tempValue, setTempValue] = useState(value);
     const inputRef = useRef(null);
 
+    // Sync internal state when parent value changes
     useEffect(() => { setTempValue(value); }, [value]);
 
+    // Focus input when editing starts
+    useEffect(() => { 
+        if (isEditing && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isEditing]);
+
+    // Handle saving for Text Inputs (Blur event)
     const handleBlur = () => {
         setIsEditing(false);
-        if (tempValue !== value) onSave(tempValue);
+        if (tempValue !== value) {
+            onSave(tempValue);
+        }
     };
 
-    useEffect(() => { if (isEditing && inputRef.current) inputRef.current.focus(); }, [isEditing]);
+    // Handle saving for Dropdowns (Change event)
+    const handleSelectChange = (e) => {
+        const newValue = e.target.value;
+        setTempValue(newValue); 
+        onSave(newValue); // Save IMMEDIATELLY using the event value, not state
+        setIsEditing(false); // Close edit mode immediately
+    };
 
     if (isEditing) {
+        // --- DROPDOWN MODE ---
         if (options && options.length > 0) {
             return (
                 <select
                     ref={inputRef}
                     value={tempValue}
-                    onChange={(e) => { setTempValue(e.target.value); e.target.blur(); }}
-                    onBlur={handleBlur}
-                    className={`w-full min-w-[100px] p-1.5 border border-indigo-300 rounded-lg bg-white text-slate-900 outline-none text-sm shadow-sm focus:ring-2 focus:ring-indigo-200 ${className}`}
+                    onChange={handleSelectChange} // Use the new handler
+                    onBlur={() => setIsEditing(false)} // Just close on blur, don't save (saving happens on change)
+                    className={`w-full min-w-[100px] p-1.5 border-2 border-indigo-400 rounded-lg bg-white text-slate-900 outline-none text-sm shadow-lg animate-in fade-in zoom-in duration-200 ${className}`}
                 >
-                    <option value="">-</option>
-                    {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    <option value="" disabled>Select...</option>
+                    {/* Ensure current value is shown even if not in options list initially */}
+                    {!options.includes(value) && value && <option value={value}>{value}</option>}
+                    {options.map((opt, idx) => (
+                        <option key={`${opt}-${idx}`} value={opt}>{opt}</option>
+                    ))}
                 </select>
             )
         }
-        return <input ref={inputRef} value={tempValue} onChange={(e) => setTempValue(e.target.value)} onBlur={handleBlur} onKeyDown={(e) => e.key === 'Enter' && inputRef.current.blur()} className={`w-full min-w-[80px] p-1.5 border border-indigo-300 rounded-lg bg-white text-slate-900 outline-none text-sm shadow-sm focus:ring-2 focus:ring-indigo-200 ${className}`} />;
+
+        // --- TEXT INPUT MODE ---
+        return (
+            <input 
+                ref={inputRef} 
+                value={tempValue} 
+                onChange={(e) => setTempValue(e.target.value)} 
+                onBlur={handleBlur} 
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        inputRef.current.blur(); // Trigger blur to save
+                    } else if (e.key === 'Escape') {
+                        setTempValue(value); // Revert
+                        setIsEditing(false);
+                    }
+                }} 
+                className={`w-full min-w-[80px] p-1.5 border-2 border-indigo-400 rounded-lg bg-white text-slate-900 outline-none text-sm shadow-lg animate-in fade-in zoom-in duration-200 ${className}`} 
+            />
+        );
     }
 
-    return <div onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className={`cursor-text hover:bg-indigo-50 hover:text-indigo-700 px-2 py-1.5 -mx-2 rounded-lg transition-all border border-transparent hover:border-indigo-100 min-h-[28px] flex items-center ${className}`}>{value || <span className="text-slate-300 italic text-xs">Empty</span>}</div>;
+    // --- VIEW MODE ---
+    return (
+        <div 
+            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} 
+            className={`cursor-pointer group hover:bg-indigo-50 hover:text-indigo-700 px-2 py-1.5 -mx-2 rounded-lg transition-all border border-transparent hover:border-indigo-100 min-h-[32px] flex items-center relative ${className}`}
+            title="Click to edit"
+        >
+            <span className="truncate w-full">
+                {value || <span className="text-slate-300 italic text-xs">Empty</span>}
+            </span>
+            {/* Visual indicator on hover */}
+            <span className="absolute right-1 opacity-0 group-hover:opacity-40 text-[10px] text-indigo-400">▼</span>
+        </div>
+    );
 });
 
+// --- STAT CARD ---
 export const StatCard = memo(({ icon: Icon, label, value, color }) => (
     <div className="bg-white/80 backdrop-blur-xl p-6 rounded-3xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex items-center gap-5 hover:-translate-y-1 transition-transform duration-300 group">
         <div className={`p-4 rounded-2xl ${color.replace('bg-', 'bg-opacity-10 text-')} group-hover:scale-110 transition-transform duration-300`}>
@@ -60,21 +116,22 @@ export const StatCard = memo(({ icon: Icon, label, value, color }) => (
     </div>
 ));
 
+// --- CONFIRM MODAL ---
 export const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, type = 'danger' }) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-fade-in">
-            <div className="glass-modal rounded-3xl max-w-sm w-full p-8 animate-scale-in">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-8 animate-scale-in shadow-2xl relative">
                 <div className="flex flex-col items-center text-center">
-                    <div className={`p-4 rounded-2xl mb-5 shadow-inner ${type === 'danger' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500'}`}>
-                        {type === 'danger' ? <AlertTriangleIcon className="h-10 w-10" /> : <RotateCcwIcon className="h-10 w-10" />}
+                    <div className={`p-4 rounded-full mb-5 ${type === 'danger' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500'}`}>
+                        {type === 'danger' ? <AlertTriangleIcon className="h-8 w-8" /> : <RotateCcwIcon className="h-8 w-8" />}
                     </div>
                     <h3 className="text-xl font-bold text-slate-800 mb-2">{title}</h3>
                     <p className="text-slate-500 text-sm mb-8 leading-relaxed">{message}</p>
                     <div className="flex gap-3 w-full">
-                        <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-colors">បោះបង់</button>
-                        <button onClick={onConfirm} className={`flex-1 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl transition-all ${type === 'danger' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'}`}>
-                            {type === 'danger' ? 'យល់ព្រម' : 'ស្តារវិញ'}
+                        <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">Cancel</button>
+                        <button onClick={onConfirm} className={`flex-1 py-3 rounded-xl text-white font-bold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 ${type === 'danger' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'}`}>
+                            {type === 'danger' ? 'Confirm' : 'Restore'}
                         </button>
                     </div>
                 </div>
