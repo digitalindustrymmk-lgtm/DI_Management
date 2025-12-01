@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 const ACADEMIC_YEARS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027"];
 const GENERATIONS = ["Gen 1", "Gen 2", "Gen 3", "Gen 4", "Gen 5", "Gen 6"];
 
-// --- INLINED ICONS (To ensure compilation) ---
+// --- INLINED ICONS ---
 const XIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
 const CameraIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
 const UploadIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>;
@@ -15,35 +15,52 @@ const ChevronDownIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width
 const Loader2Icon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
 const CheckCircleIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
 
+// --- CLOUDINARY CONFIGURATION ---
+const CLOUD_NAME = "dsruankj0"; 
+const UPLOAD_PRESET = "staff_app"; 
+
 export default function EmployeeFormModal({ isOpen, onClose, employee, db, addToast, settings }) {
     // Initialize form state
     const [formData, setFormData] = useState({ 
         name: '', latinName: '', gender: 'ប្រុស', dob: '', pob: '', 
         studentId: '', academicYear: '', generation: '', group: '', 
         class: '', skill: '', section: '', position: '', telegram: '', 
-        imageUrl: '', 
+        imageUrl: '', // This stores the URL from Database
         mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' 
     });
     
     const [loading, setLoading] = useState(false);
+    
+    // State for local preview and the actual file to upload
     const [previewUrl, setPreviewUrl] = useState('');
+    const [imageFile, setImageFile] = useState(null); // Stores the raw file object
 
     // Load employee data if editing
     useEffect(() => { 
         if (employee) { 
             setFormData({ ...employee }); 
             setPreviewUrl(employee.imageUrl || ''); 
-        } 
+            setImageFile(null); // Reset file on load
+        } else {
+            // Reset for new entry
+            setPreviewUrl('');
+            setImageFile(null);
+            setFormData({ 
+                name: '', latinName: '', gender: 'ប្រុស', dob: '', pob: '', 
+                studentId: '', academicYear: '', generation: '', group: '', 
+                class: '', skill: '', section: '', position: '', telegram: '', 
+                imageUrl: '', 
+                mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' 
+            });
+        }
     }, [employee]);
     
     // Handle input changes
     const handleChange = (e) => { 
         const { name, value } = e.target; 
         
-        // Validation: Khmer names only allow Khmer characters and spaces (optional strictness)
         if (name === 'name' && /[^ \u1780-\u17FF]/.test(value)) return; 
         
-        // Validation: Latin names uppercase only
         if (name === 'latinName') {
             if (/[^a-zA-Z\s]/.test(value)) return;
             setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
@@ -53,22 +70,40 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
         setFormData(prev => ({ ...prev, [name]: value })); 
     };
 
-    // Handle Image Upload
-    const handleImageUpload = async (e) => {
+    // Handle Image Selection
+    const handleImageUpload = (e) => {
         const file = e.target.files[0]; if (!file) return;
         
-        // Limit image size (optional but recommended for Realtime DB)
-        if (file.size > 1024 * 1024) { // 1MB limit
-             alert("រូបភាពធំពេក! សូមជ្រើសរើសរូបភាពក្រោម 1MB");
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit for Cloudinary
+             alert("រូបភាពធំពេក! សូមជ្រើសរើសរូបភាពក្រោម 5MB");
              return;
         }
 
+        // 1. Store the File object to upload later
+        setImageFile(file);
+
+        // 2. Create a local preview immediately
         const reader = new FileReader(); 
         reader.onloadend = () => { 
             setPreviewUrl(reader.result); 
-            setFormData(prev => ({ ...prev, imageUrl: reader.result })); 
         }; 
         reader.readAsDataURL(file);
+    };
+
+    // --- HELPER: UPLOAD TO CLOUDINARY ---
+    const uploadToCloudinary = async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", UPLOAD_PRESET);
+
+        const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+            { method: "POST", body: formData }
+        );
+
+        if (!response.ok) throw new Error("Cloudinary upload failed");
+        const data = await response.json();
+        return data.secure_url; // Returns the HTTP link
     };
 
     // --- MAIN SAVE LOGIC ---
@@ -91,14 +126,29 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                 return;
             }
 
-            // Prepare payload
+            // 3. UPLOAD IMAGE IF NEW FILE SELECTED
+            let finalImageUrl = formData.imageUrl; // Default to existing URL
+            
+            if (imageFile) {
+                try {
+                    // Upload to Cloudinary and get the link
+                    finalImageUrl = await uploadToCloudinary(imageFile);
+                } catch (uploadError) {
+                    console.error("Image upload failed:", uploadError);
+                    alert("បរាជ័យក្នុងការ Upload រូបភាព។ សូមព្យាយាមម្តងទៀត។");
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // 4. Prepare payload (Save the Link, not the file)
             const dbPayload = {
                 'ឈ្មោះ': formData.name, 
                 'ឈ្មោះឡាតាំង': formData.latinName, 
                 'ភេទ': formData.gender, 
                 'ថ្ងៃខែឆ្នាំកំណើត': formData.dob, 
                 'ទីកន្លែងកំណើត': formData.pob, 
-                'អត្តលេខ': formData.studentId, // ID stored inside data
+                'អត្តលេខ': formData.studentId,
                 'ឆ្នាំសិក្សា': formData.academicYear, 
                 'ជំនាន់': formData.generation, 
                 'ក្រុម': formData.group, 
@@ -107,7 +157,7 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                 'ផ្នែកការងារ': formData.section, 
                 'តួនាទី': formData.position, 
                 'តេឡេក្រាម': formData.telegram, 
-                'រូបថត': formData.imageUrl,
+                'រូបថត': finalImageUrl, // <--- Saving the URL here
                 'កាលវិភាគ': { 
                     'ចន្ទ': formData.mon, 'អង្គារ៍': formData.tue, 'ពុធ': formData.wed, 
                     'ព្រហស្បត្តិ៍': formData.thu, 'សុក្រ': formData.fri, 'សៅរ៍': formData.sat, 'អាទិត្យ': formData.sun 
@@ -116,13 +166,12 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
             
             if (employee?.id) { 
                 // --- EDIT MODE ---
-                // We update the existing record based on the original ID key
+                // NOTE: We rely on the existing ID structure. 
                 await db.ref(`students/${employee.id}`).update(dbPayload); 
                 addToast("កែប្រែព័ត៌មានជោគជ័យ"); 
             } 
             else { 
                 // --- CREATE MODE ---
-                // 1. Check if ID exists first
                 const snapshot = await db.ref(`students/${formData.studentId}`).once('value');
                 
                 if (snapshot.exists()) {
@@ -131,7 +180,6 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                     return;
                 }
 
-                // 2. Save using Custom ID (e.g., students/001)
                 await db.ref(`students/${formData.studentId}`).set(dbPayload); 
                 addToast("បញ្ចូលទិន្នន័យថ្មីជោគជ័យ"); 
             }
@@ -197,7 +245,7 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                                     name="studentId" 
                                     value={formData.studentId} 
                                     onChange={handleChange} 
-                                    disabled={!!employee} // Optional: Disable ID editing if you don't want them to change key
+                                    disabled={!!employee} 
                                     className={`w-full p-4 border-slate-200 rounded-2xl bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all text-center font-mono font-bold text-xl text-indigo-600 tracking-widest shadow-sm input-modern ${!!employee ? 'opacity-70 cursor-not-allowed' : ''}`}
                                     placeholder="ID..." 
                                 />
@@ -276,7 +324,7 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                 <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-end gap-4 shrink-0">
                     <button onClick={onClose} className="px-8 py-3 rounded-xl text-slate-600 font-semibold hover:bg-slate-100 transition-colors">បោះបង់</button>
                     <button onClick={handleSubmit} disabled={loading || !isFormValid} className="px-10 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 transition-all">
-                        {loading ? <Loader2Icon className="h-5 w-5 animate-spin" /> : <CheckCircleIcon className="h-5 w-5" />} រក្សាទុក
+                        {loading ? <Loader2Icon className="h-5 w-5 animate-spin" /> : <CheckCircleIcon className="h-5 w-5" />} {employee ? 'កែប្រែ' : 'រក្សាទុក'}
                     </button>
                 </div>
             </div>
