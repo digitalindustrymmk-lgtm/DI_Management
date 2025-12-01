@@ -21,13 +21,25 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
         return [...new Set(years)].sort();
     }, [employees]);
 
+    // UPDATED SEARCH LOGIC HERE
     const filteredEmployees = useMemo(() => {
         return employees.filter(emp => {
             const matchClass = filterClass ? emp.class === filterClass : true;
             const matchYear = filterYear ? emp.academicYear === filterYear : true;
             const isNumericId = /^\d+$/.test(emp.studentId || '');
-            const term = searchTerm.toLowerCase();
-            const matchSearch = (emp.name || '').toLowerCase().includes(term) || (emp.latinName || '').toLowerCase().includes(term) || (emp.studentId || '').toLowerCase().includes(term);
+
+            // 1. Remove all spaces from search term and convert to lowercase
+            const cleanSearchTerm = searchTerm.toLowerCase().replace(/\s+/g, '');
+
+            // 2. Prepare data fields by removing spaces and converting to lowercase
+            const cleanName = (emp.name || '').toLowerCase().replace(/\s+/g, '');
+            const cleanLatinName = (emp.latinName || '').toLowerCase().replace(/\s+/g, '');
+            const cleanId = (emp.studentId || '').toLowerCase().replace(/\s+/g, '');
+
+            // 3. Perform check
+            const matchSearch = cleanName.includes(cleanSearchTerm) || 
+                                cleanLatinName.includes(cleanSearchTerm) || 
+                                cleanId.includes(cleanSearchTerm);
             
             return matchClass && matchYear && isNumericId && matchSearch;
         });

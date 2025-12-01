@@ -10,6 +10,12 @@ import BulkEditView from './views/BulkEditView';
 import EmployeeFormModal from './components/EmployeeFormModal';
 import { ACADEMIC_YEARS, GENERATIONS, GENDER_OPTIONS, safeString } from './utils';
 
+// --- HELPER: SMART SEARCH NORMALIZER ---
+const normalizeString = (str) => {
+    if (!str) return '';
+    return String(str).toLowerCase().replace(/\s+/g, '');
+};
+
 // Hook for Toasts
 const useToast = () => {
     const [toasts, setToasts] = useState([]);
@@ -23,7 +29,6 @@ const useToast = () => {
 };
 
 // --- SUB-COMPONENTS (Card, Row, TrashRow) ---
-// ... (These remain exactly the same as before) ...
 const EmployeeCard = memo(({ employee, onEdit, onDelete, index }) => (
     <div className="group bg-white/70 backdrop-blur-md rounded-3xl border border-white/60 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-2 transition-all duration-300 overflow-hidden flex flex-col animate-fade-in" style={{ animationDelay: `${index * 50}ms` }} onDoubleClick={onEdit}>
         <div className="p-6 flex flex-col items-center text-center relative">
@@ -137,11 +142,11 @@ const EmployeeListView = ({
     onInlineUpdate, 
     onCreate 
 }) => {
-    const [viewMode, setViewMode] = useState('list');
+    // 1. Initialize viewMode based on screen size (Grid for mobile, List for desktop)
+    const [viewMode, setViewMode] = useState(window.innerWidth < 768 ? 'grid' : 'list');
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 50;
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     
     // Table Dragging Refs
     const tableContainerRef = useRef(null);
@@ -154,15 +159,15 @@ const EmployeeListView = ({
     const onMouseUp = () => { isDragging.current = false; if(tableContainerRef.current) tableContainerRef.current.classList.remove('cursor-grabbing'); };
     const onMouseMove = (e) => { if (!isDragging.current) return; e.preventDefault(); if(tableContainerRef.current) { const x = e.pageX - tableContainerRef.current.offsetLeft; const walk = (x - startX.current) * 2; tableContainerRef.current.scrollLeft = scrollLeft.current - walk; } };
 
-    useEffect(() => { 
-        const handleResize = () => setIsMobile(window.innerWidth < 768); 
-        window.addEventListener('resize', handleResize); 
-        return () => window.removeEventListener('resize', handleResize); 
-    }, []);
-
+    // --- SEARCH LOGIC (NORMALIZED) ---
     const filteredEmployees = useMemo(() => {
-        const term = (searchTerm || '').toLowerCase();
-        return employees.filter(emp => (emp.name || '').toLowerCase().includes(term) || (emp.latinName || '').toLowerCase().includes(term) || (emp.studentId || '').toLowerCase().includes(term));
+        if (!searchTerm) return employees;
+        const term = normalizeString(searchTerm);
+        return employees.filter(emp => 
+            normalizeString(emp.name).includes(term) || 
+            normalizeString(emp.latinName).includes(term) || 
+            normalizeString(emp.studentId).includes(term)
+        );
     }, [employees, searchTerm]);
 
     // Reset page on search
@@ -170,6 +175,20 @@ const EmployeeListView = ({
 
     const currentItems = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
     const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+
+    // --- REUSABLE PAGINATION COMPONENT ---
+    const PaginationControls = ({ className }) => (
+        <div className={className}>
+            <div className="text-xs font-medium text-slate-500 mb-2 md:mb-0">
+                Showing {filteredEmployees.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} to {Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length}
+            </div>
+            <div className="flex gap-2">
+                <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 shadow-sm transition-all active:scale-95"><ChevronLeftIcon className="h-4 w-4" /></button>
+                <div className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 shadow-sm min-w-[80px] text-center flex items-center justify-center">{currentPage} / {Math.max(totalPages, 1)}</div>
+                <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 shadow-sm transition-all active:scale-95"><ChevronRightIcon className="h-4 w-4" /></button>
+            </div>
+        </div>
+    );
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -179,14 +198,15 @@ const EmployeeListView = ({
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
                     <input type="text" className="block w-full pl-12 pr-4 py-3 border-none rounded-2xl bg-white/50 focus:bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ស្វែងរក..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
-                <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="flex items-center justify-between w-full md:w-auto gap-3">
                     {!isRecycleBin && (
                         <>
-                        <div className="bg-white/50 p-1.5 rounded-xl hidden md:flex items-center ring-1 ring-slate-200">
+                        {/* 2. REMOVED 'hidden' class here, changed to 'flex' */}
+                        <div className="bg-white/50 p-1.5 rounded-xl flex items-center ring-1 ring-slate-200">
                             <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
                             <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
                         </div>
-                        <button onClick={onCreate} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span>បង្កើតថ្មី</span></button>
+                        <button onClick={onCreate} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span className="hidden sm:inline">បង្កើតថ្មី</span><span className="sm:hidden">New</span></button>
                         </>
                     )}
                 </div>
@@ -201,12 +221,19 @@ const EmployeeListView = ({
                 </div>
             ) : (
                 <>
-                    {((viewMode === 'grid' || isMobile) && !isRecycleBin) ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-                            {currentItems.map((emp, idx) => <EmployeeCard key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} index={idx} />)}
-                        </div>
+                    {/* 3. Logic: Only check viewMode (removed || isMobile check) */}
+                    {(viewMode === 'grid' && !isRecycleBin) ? (
+                        <>
+                            {/* --- GRID VIEW --- */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {currentItems.map((emp, idx) => <EmployeeCard key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} index={idx} />)}
+                            </div>
+                            {/* --- PAGINATION FOR GRID VIEW --- */}
+                            <PaginationControls className="glass-panel p-4 rounded-2xl flex flex-col md:flex-row justify-between items-center bg-white/80 mt-6" />
+                        </>
                     ) : (
-                        <div className="glass-panel rounded-3xl overflow-hidden pb-4 bg-white/80">
+                        <div className="glass-panel rounded-3xl overflow-hidden pb-0 bg-white/80">
+                            {/* --- LIST VIEW --- */}
                             <div ref={tableContainerRef} className="overflow-x-auto cursor-grab active:cursor-grabbing custom-scrollbar" onMouseDown={onMouseDown} onMouseLeave={onMouseLeave} onMouseUp={onMouseUp} onMouseMove={onMouseMove}>
                                 <table className="min-w-full divide-y divide-slate-100">
                                     <thead className="bg-slate-50/80 backdrop-blur-md">
@@ -239,14 +266,9 @@ const EmployeeListView = ({
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-                                <div className="text-xs font-medium text-slate-500">Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length}</div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600"><ChevronLeftIcon className="h-4 w-4" /></button>
-                                    <div className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700">{currentPage} / {totalPages}</div>
-                                    <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600"><ChevronRightIcon className="h-4 w-4" /></button>
-                                </div>
-                            </div>
+                            
+                            {/* --- PAGINATION FOR LIST VIEW --- */}
+                            <PaginationControls className="flex flex-col md:flex-row justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/50" />
                         </div>
                     )}
                 </>
@@ -403,7 +425,7 @@ function App() {
                 </div>
             </div>
         );
-    }
+    };
 
     return (
         // REMOVED <Router> here because it is provided by main.jsx
