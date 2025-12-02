@@ -27,6 +27,96 @@ const useToast = () => {
     return { toasts, addToast, removeToast };
 };
 
+// --- LOGIN COMPONENT (NEW) ---
+const LoginView = ({ onLogin, loading, error }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+  
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      onLogin(email, password);
+    };
+  
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden font-sans">
+          {/* Animated Background Blobs */}
+          <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-[120px] animate-pulse delay-1000"></div>
+  
+          <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-10 rounded-[40px] shadow-2xl w-full max-w-md m-4 animate-fade-in z-10 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+              
+              <div className="flex flex-col items-center mb-10">
+                  <div className="h-20 w-20 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-6 transform rotate-6 border border-white/20">
+                      <DatabaseIcon className="h-10 w-10 text-white" />
+                  </div>
+                  <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">HR PRO</h1>
+                  <p className="text-slate-400 text-sm font-medium">Please sign in to continue</p>
+              </div>
+  
+              <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-2">Email Address</label>
+                      <div className="relative group">
+                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                              <UserIcon className="h-5 w-5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                          </div>
+                          <input 
+                              type="email" 
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              className="block w-full pl-12 pr-4 py-4 bg-slate-900/60 border border-slate-700/50 rounded-2xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all font-medium"
+                              placeholder="admin@dilistname.com"
+                              required
+                          />
+                      </div>
+                  </div>
+  
+                  <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-2">Password</label>
+                      <div className="relative group">
+                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                              <svg className="h-5 w-5 text-slate-500 group-focus-within:text-blue-400 transition-colors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                          </div>
+                          <input 
+                              type="password" 
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              className="block w-full pl-12 pr-4 py-4 bg-slate-900/60 border border-slate-700/50 rounded-2xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all font-medium"
+                              placeholder="••••••••••••"
+                              required
+                          />
+                      </div>
+                  </div>
+  
+                  {error && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-center gap-3 text-red-200 text-sm animate-pulse">
+                          <div className="h-2 w-2 rounded-full bg-red-500 shrink-0"></div>
+                          {error}
+                      </div>
+                  )}
+  
+                  <button 
+                      type="submit" 
+                      disabled={loading}
+                      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-4 rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-[0.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 mt-4"
+                  >
+                      {loading ? (
+                          <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : (
+                          <>Sign In <ChevronRightIcon className="h-5 w-5" /></>
+                      )}
+                  </button>
+              </form>
+              
+              <div className="mt-10 text-center">
+                  <p className="text-slate-500 text-xs font-medium">Secured by Google Firebase</p>
+              </div>
+          </div>
+      </div>
+    );
+};
+
 // --- SUB-COMPONENTS (Card, Row, TrashRow) ---
 
 const EmployeeCard = memo(({ employee, onEdit, onDelete, index, isSelected, onToggleSelect }) => (
@@ -251,7 +341,7 @@ const EmployeeListView = ({
                         </button>
                     )}
 
-                    {/* SELECT ALL BUTTON (Mobile) - NEW! */}
+                    {/* SELECT ALL BUTTON (Mobile) */}
                     <button
                         onClick={toggleSelectAll}
                         className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`}
@@ -354,7 +444,7 @@ const EmployeeListView = ({
                                         <thead className="bg-slate-50/80 backdrop-blur-md">
                                             <tr>
                                                 <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">
-                                                     {/* HEADER CHECKBOX */}
+                                                    {/* HEADER CHECKBOX */}
                                                     {!isRecycleBin ? (
                                                         <div className="flex items-center gap-2">
                                                             <input 
@@ -417,6 +507,9 @@ const EmployeeListView = ({
 // --- MAIN APP COMPONENT ---
 function App() {
     const [user, setUser] = useState(null);
+    const [adminProfile, setAdminProfile] = useState(null); // NEW: Admin Profile State
+    const [loginLoading, setLoginLoading] = useState(false);
+    const [loginError, setLoginError] = useState('');
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [employees, setEmployees] = useState([]);
     const [deletedEmployees, setDeletedEmployees] = useState([]);
@@ -427,14 +520,65 @@ function App() {
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
     const { toasts, addToast, removeToast } = useToast();
 
-    // Firebase Data Fetching
-    useEffect(() => { const unsubscribe = auth.onAuthStateChanged((u) => setUser(u)); auth.signInAnonymously().catch((error) => { console.error("Sign in failed:", error); addToast("បរាជ័យក្នុងការ Sign In", 'error'); }); return () => unsubscribe(); }, []);
+    // Firebase Auth State Listener & Persistence Logic
+    useEffect(() => { 
+        const unsubscribe = auth.onAuthStateChanged((u) => {
+            setUser(u);
+            if (u) {
+                // User is signed in, sync to localStorage (per request)
+                localStorage.setItem('user_session', JSON.stringify({ uid: u.uid, email: u.email }));
+            } else {
+                // User is signed out
+                localStorage.removeItem('user_session');
+                setAdminProfile(null);
+            }
+            setLoading(false); // Stop loading once we know auth state
+        }); 
+        return () => unsubscribe(); 
+    }, []);
     
+    // LOGIN HANDLER
+    const handleLogin = async (email, password) => {
+        setLoginLoading(true);
+        setLoginError('');
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            // Successful login will trigger onAuthStateChanged
+        } catch (error) {
+            console.error("Login failed:", error);
+            let msg = "Failed to sign in. Please check your credentials.";
+            if (error.code === 'auth/wrong-password') msg = "Incorrect password.";
+            if (error.code === 'auth/user-not-found') msg = "No user found with this email.";
+            setLoginError(msg);
+        } finally {
+            setLoginLoading(false);
+        }
+    };
+
+    // LOGOUT HANDLER (Updated with Confirmation)
+    const handleLogout = () => {
+        setConfirmDialog({
+            isOpen: true,
+            type: 'danger',
+            title: 'Sign Out',
+            message: 'Are you sure you want to sign out?',
+            onConfirm: async () => {
+                await auth.signOut();
+                localStorage.removeItem('user_session'); // Clear localStorage
+                setConfirmDialog(prev => ({...prev, isOpen: false}));
+                addToast("Signed out successfully", "success");
+            }
+        });
+    };
+
+    // Firebase Data Fetching (Only if user is logged in)
     useEffect(() => {
         if (!user) return;
         const dbRef = db.ref('students');
         const deletedRef = db.ref('deleted_students');
         const settingsRef = db.ref('settings');
+        // NEW: Fetch Admin Profile Info
+        const adminRef = db.ref('userAdmin/' + user.uid);
 
         const handleData = (snapshot, setFn) => {
             const data = snapshot.val();
@@ -451,7 +595,16 @@ function App() {
         dbRef.on('value', snap => { handleData(snap, setEmployees); setLoading(false); });
         deletedRef.on('value', snap => handleData(snap, setDeletedEmployees));
         settingsRef.on('value', snap => setSettings(snap.val() || {}));
-        return () => { dbRef.off(); deletedRef.off(); settingsRef.off(); };
+        
+        // Listen for Admin Profile
+        adminRef.on('value', snap => {
+            const data = snap.val();
+            if (data) {
+                setAdminProfile(data);
+            }
+        });
+
+        return () => { dbRef.off(); deletedRef.off(); settingsRef.off(); adminRef.off(); };
     }, [user]);
 
     const stats = useMemo(() => ({ total: employees.length, male: employees.filter(e => e.gender === 'ប្រុស').length, female: employees.filter(e => e.gender === 'ស្រី').length }), [employees]);
@@ -538,8 +691,11 @@ function App() {
                     </div>
                     <div className="p-6">
                         <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-4 text-center">
-                            <p className="text-white text-xs font-medium opacity-80 mb-2">Logged in as Admin</p>
-                            <button className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-all text-sm font-bold backdrop-blur-sm"><LogOutIcon className="h-4 w-4" /> Sign Out</button>
+                            {/* DYNAMIC PROFILE INFO IN SIDEBAR */}
+                            <p className="text-white text-sm font-bold mb-0.5">{adminProfile?.username || user?.email || 'Admin'}</p>
+                            <p className="text-white/60 text-xs font-medium opacity-80 mb-3">{adminProfile?.role || 'User'}</p>
+                            
+                            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-all text-sm font-bold backdrop-blur-sm"><LogOutIcon className="h-4 w-4" /> Sign Out</button>
                         </div>
                     </div>
                 </aside>
@@ -557,7 +713,16 @@ function App() {
                         <div className="flex items-center gap-6">
                             <div className="relative"><BellIcon className="h-6 w-6 text-slate-400 hover:text-indigo-500 transition-colors cursor-pointer" /><span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-white"></span></div>
                             <div className="h-8 w-[1px] bg-slate-200"></div>
-                            <div className="flex items-center gap-3"><div className="text-right hidden md:block"><div className="text-sm font-bold text-slate-700">Admin User</div><div className="text-xs text-slate-400 font-medium">Super Admin</div></div><div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white">A</div></div>
+                            <div className="flex items-center gap-3">
+                                <div className="text-right hidden md:block">
+                                    {/* DYNAMIC PROFILE INFO IN HEADER */}
+                                    <div className="text-sm font-bold text-slate-700">{adminProfile?.username || user?.email || 'Admin User'}</div>
+                                    <div className="text-xs text-slate-400 font-medium">{adminProfile?.role || 'Loading...'}</div>
+                                </div>
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white">
+                                    {adminProfile?.username ? adminProfile.username.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'A')}
+                                </div>
+                            </div>
                         </div>
                     </header>
 
@@ -596,12 +761,20 @@ function App() {
         );
     };
 
+    // --- MAIN RENDER ---
+    // If not logged in, show LoginView. If logged in, show MainLayout.
     return (
         <>
-            <MainLayout />
-            {isModalOpen && <EmployeeFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} employee={currentEmployee} db={db} addToast={addToast} settings={settings} />}
-            <ConfirmModal isOpen={confirmDialog.isOpen} onClose={() => setConfirmDialog(prev => ({...prev, isOpen: false}))} {...confirmDialog} />
-            <ToastContainer toasts={toasts} removeToast={removeToast} />
+            {!user ? (
+                <LoginView onLogin={handleLogin} loading={loginLoading} error={loginError} />
+            ) : (
+                <>
+                    <MainLayout />
+                    {isModalOpen && <EmployeeFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} employee={currentEmployee} db={db} addToast={addToast} settings={settings} />}
+                    <ConfirmModal isOpen={confirmDialog.isOpen} onClose={() => setConfirmDialog(prev => ({...prev, isOpen: false}))} {...confirmDialog} />
+                    <ToastContainer toasts={toasts} removeToast={removeToast} />
+                </>
+            )}
         </>
     );
 }
