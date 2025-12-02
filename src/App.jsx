@@ -128,12 +128,13 @@ const TrashRow = memo(({ employee, onRestore, onPermanentDelete, index }) => (
     </tr>
 ));
 
-// --- NEW COMPONENT: Encapsulated Employee List View ---
+// --- COMPONENT: Encapsulated Employee List View ---
 const EmployeeListView = ({ 
     employees, 
     loading, 
     settings,
     isRecycleBin = false, 
+    isModalOpen, // UPDATED: Receive prop
     onEdit, 
     onDelete, 
     onRestore, 
@@ -141,14 +142,12 @@ const EmployeeListView = ({
     onInlineUpdate, 
     onCreate 
 }) => {
-    // 1. Initialize viewMode based on screen size (Grid for mobile, List for desktop)
     const [viewMode, setViewMode] = useState(window.innerWidth < 768 ? 'grid' : 'list');
     const [searchTerm, setSearchTerm] = useState('');
-    const [showMobileSearch, setShowMobileSearch] = useState(false); // State for mobile search bar toggle
+    const [showMobileSearch, setShowMobileSearch] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 50;
     
-    // Force Grid View on Mobile Resize
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth < 768) {
@@ -159,7 +158,6 @@ const EmployeeListView = ({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
     
-    // Table Dragging Refs
     const tableContainerRef = useRef(null);
     const isDragging = useRef(false);
     const startX = useRef(0);
@@ -170,7 +168,6 @@ const EmployeeListView = ({
     const onMouseUp = () => { isDragging.current = false; if(tableContainerRef.current) tableContainerRef.current.classList.remove('cursor-grabbing'); };
     const onMouseMove = (e) => { if (!isDragging.current) return; e.preventDefault(); if(tableContainerRef.current) { const x = e.pageX - tableContainerRef.current.offsetLeft; const walk = (x - startX.current) * 2; tableContainerRef.current.scrollLeft = scrollLeft.current - walk; } };
 
-    // --- SEARCH LOGIC (NORMALIZED) ---
     const filteredEmployees = useMemo(() => {
         if (!searchTerm) return employees;
         const term = normalizeString(searchTerm);
@@ -181,13 +178,11 @@ const EmployeeListView = ({
         );
     }, [employees, searchTerm]);
 
-    // Reset page on search
     useEffect(() => setCurrentPage(1), [searchTerm]);
 
     const currentItems = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
     const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
 
-    // --- REUSABLE PAGINATION COMPONENT ---
     const PaginationControls = ({ className }) => (
         <div className={className}>
             <div className="text-xs font-medium text-slate-500 mb-2 md:mb-0">
@@ -203,9 +198,8 @@ const EmployeeListView = ({
 
     return (
         <>
-            {/* 1. MOBILE FLOATING ACTION BUTTONS - MOVED OUTSIDE THE ANIMATED DIV */}
-            {/* This ensures they are truly FIXED to the viewport and not affected by parent animations */}
-            {!isRecycleBin && (
+            {/* UPDATED: Hide buttons if Modal is Open */}
+            {!isRecycleBin && !isModalOpen && (
                 <div className="md:hidden fixed bottom-6 right-6 flex flex-col gap-4 z-[100]">
                     <button 
                         onClick={() => setShowMobileSearch(!showMobileSearch)} 
@@ -225,12 +219,9 @@ const EmployeeListView = ({
                 </div>
             )}
 
-            {/* 2. MAIN CONTENT (ANIMATED) */}
             <div className="space-y-6 animate-fade-in relative min-h-[500px]">
-                {/* Toolbar */}
                 <div className={`glass-panel p-4 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4 sticky top-0 z-20 transition-all duration-300 ${!showMobileSearch ? 'hidden md:flex' : 'flex'}`}>
                     
-                    {/* Search Bar - Hidden on Mobile unless Toggled */}
                     <div className={`relative w-full md:w-96 group transition-all duration-300 ${showMobileSearch ? 'block' : 'hidden md:block'}`}>
                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
                         <input type="text" className="block w-full pl-12 pr-4 py-3 border-none rounded-2xl bg-white/50 focus:bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ស្វែងរក..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
@@ -239,12 +230,10 @@ const EmployeeListView = ({
                     <div className="flex items-center justify-between w-full md:w-auto gap-3">
                         {!isRecycleBin && (
                             <>
-                            {/* Hidden md:flex = Only show on Desktop */}
                             <div className="hidden md:flex bg-white/50 p-1.5 rounded-xl items-center ring-1 ring-slate-200">
                                 <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
                                 <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
                             </div>
-                            {/* Hidden md:flex = Create Button only on Desktop (Mobile uses FAB) */}
                             <button onClick={onCreate} className="hidden md:flex flex-1 md:flex-none items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span className="hidden sm:inline">បង្កើតថ្មី</span><span className="sm:hidden">New</span></button>
                             </>
                         )}
@@ -262,16 +251,13 @@ const EmployeeListView = ({
                     <>
                         {(viewMode === 'grid' && !isRecycleBin) ? (
                             <>
-                                {/* --- GRID VIEW --- */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {currentItems.map((emp, idx) => <EmployeeCard key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} index={idx} />)}
                                 </div>
-                                {/* --- PAGINATION FOR GRID VIEW --- */}
                                 <PaginationControls className="glass-panel p-4 rounded-2xl flex flex-col md:flex-row justify-between items-center bg-white/80 mt-6" />
                             </>
                         ) : (
                             <div className="glass-panel rounded-3xl overflow-hidden pb-0 bg-white/80">
-                                {/* --- LIST VIEW --- */}
                                 <div ref={tableContainerRef} className="overflow-x-auto cursor-grab active:cursor-grabbing custom-scrollbar" onMouseDown={onMouseDown} onMouseLeave={onMouseLeave} onMouseUp={onMouseUp} onMouseMove={onMouseMove}>
                                     <table className="min-w-full divide-y divide-slate-100">
                                         <thead className="bg-slate-50/80 backdrop-blur-md">
@@ -304,8 +290,6 @@ const EmployeeListView = ({
                                         </tbody>
                                     </table>
                                 </div>
-                                
-                                {/* --- PAGINATION FOR LIST VIEW --- */}
                                 <PaginationControls className="flex flex-col md:flex-row justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/50" />
                             </div>
                         )}
@@ -441,6 +425,7 @@ function App() {
                                     employees={employees} 
                                     loading={loading}
                                     settings={settings}
+                                    isModalOpen={isModalOpen} /* UPDATED: Passed State Here */
                                     onEdit={(emp) => { setCurrentEmployee(emp); setIsModalOpen(true); }}
                                     onDelete={initiateDelete}
                                     onInlineUpdate={handleInlineUpdate}
@@ -467,7 +452,6 @@ function App() {
     };
 
     return (
-        // REMOVED <Router> here because it is provided by main.jsx
         <>
             <MainLayout />
             {isModalOpen && <EmployeeFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} employee={currentEmployee} db={db} addToast={addToast} settings={settings} />}
