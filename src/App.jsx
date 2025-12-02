@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
-// REMOVED "BrowserRouter as Router" because you are using HashRouter in main.jsx
 import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { db, auth } from './firebase';
-import { DatabaseIcon, LayoutGridIcon, UsersIcon, CheckSquareIcon, Trash2Icon, SettingsIcon, LogOutIcon, MenuIcon, BellIcon, SearchIcon, PlusIcon, ListIcon, Edit2Icon, UserIcon, SendIcon, ChevronLeftIcon, ChevronRightIcon, RotateCcwIcon } from './components/Icons';
+import { DatabaseIcon, LayoutGridIcon, UsersIcon, CheckSquareIcon, Trash2Icon, SettingsIcon, LogOutIcon, MenuIcon, BellIcon, SearchIcon, PlusIcon, ListIcon, Edit2Icon, UserIcon, SendIcon, ChevronLeftIcon, ChevronRightIcon, RotateCcwIcon, XIcon } from './components/Icons'; 
 import { ToastContainer, ConfirmModal, EditableCell } from './components/UI';
 import Dashboard from './views/Dashboard';
 import SettingsView from './views/SettingsView';
@@ -145,8 +144,20 @@ const EmployeeListView = ({
     // 1. Initialize viewMode based on screen size (Grid for mobile, List for desktop)
     const [viewMode, setViewMode] = useState(window.innerWidth < 768 ? 'grid' : 'list');
     const [searchTerm, setSearchTerm] = useState('');
+    const [showMobileSearch, setShowMobileSearch] = useState(false); // State for mobile search bar toggle
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 50;
+    
+    // Force Grid View on Mobile Resize
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 768) {
+                setViewMode('grid');
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
     
     // Table Dragging Refs
     const tableContainerRef = useRef(null);
@@ -191,89 +202,117 @@ const EmployeeListView = ({
     );
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            {/* Toolbar */}
-            <div className="glass-panel p-4 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4 sticky top-0 z-20">
-                <div className="relative w-full md:w-96 group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
-                    <input type="text" className="block w-full pl-12 pr-4 py-3 border-none rounded-2xl bg-white/50 focus:bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ស្វែងរក..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                </div>
-                <div className="flex items-center justify-between w-full md:w-auto gap-3">
-                    {!isRecycleBin && (
-                        <>
-                        {/* 2. REMOVED 'hidden' class here, changed to 'flex' */}
-                        <div className="bg-white/50 p-1.5 rounded-xl flex items-center ring-1 ring-slate-200">
-                            <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
-                            <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
-                        </div>
-                        <button onClick={onCreate} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span className="hidden sm:inline">បង្កើតថ្មី</span><span className="sm:hidden">New</span></button>
-                        </>
-                    )}
-                </div>
-            </div>
+        <>
+            {/* 1. MOBILE FLOATING ACTION BUTTONS - MOVED OUTSIDE THE ANIMATED DIV */}
+            {/* This ensures they are truly FIXED to the viewport and not affected by parent animations */}
+            {!isRecycleBin && (
+                <div className="md:hidden fixed bottom-6 right-6 flex flex-col gap-4 z-[100]">
+                    <button 
+                        onClick={() => setShowMobileSearch(!showMobileSearch)} 
+                        className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${showMobileSearch ? 'bg-slate-700 text-white rotate-90' : 'bg-white text-indigo-600 border border-indigo-100'}`}
+                        style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}
+                    >
+                        {showMobileSearch ? <PlusIcon className="h-6 w-6 rotate-45" /> : <SearchIcon className="h-6 w-6" />}
+                    </button>
 
-            {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">{[1, 2, 3].map(i => <div key={i} className="bg-white/50 h-64 rounded-3xl"></div>)}</div>
-            ) : filteredEmployees.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 bg-white/40 rounded-3xl border-2 border-dashed border-slate-300">
-                    <div className="bg-slate-100 p-6 rounded-full mb-4 text-slate-400">{isRecycleBin ? <Trash2Icon className="h-10 w-10" /> : <SearchIcon className="h-10 w-10" />}</div>
-                    <h3 className="text-xl font-bold text-slate-700">មិនមានទិន្នន័យ</h3>
+                    <button 
+                        onClick={onCreate} 
+                        className="h-14 w-14 bg-indigo-600 text-white rounded-full flex items-center justify-center active:scale-95 transition-transform"
+                        style={{ boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.5)' }}
+                    >
+                        <PlusIcon className="h-7 w-7" />
+                    </button>
                 </div>
-            ) : (
-                <>
-                    {/* 3. Logic: Only check viewMode (removed || isMobile check) */}
-                    {(viewMode === 'grid' && !isRecycleBin) ? (
-                        <>
-                            {/* --- GRID VIEW --- */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {currentItems.map((emp, idx) => <EmployeeCard key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} index={idx} />)}
-                            </div>
-                            {/* --- PAGINATION FOR GRID VIEW --- */}
-                            <PaginationControls className="glass-panel p-4 rounded-2xl flex flex-col md:flex-row justify-between items-center bg-white/80 mt-6" />
-                        </>
-                    ) : (
-                        <div className="glass-panel rounded-3xl overflow-hidden pb-0 bg-white/80">
-                            {/* --- LIST VIEW --- */}
-                            <div ref={tableContainerRef} className="overflow-x-auto cursor-grab active:cursor-grabbing custom-scrollbar" onMouseDown={onMouseDown} onMouseLeave={onMouseLeave} onMouseUp={onMouseUp} onMouseMove={onMouseMove}>
-                                <table className="min-w-full divide-y divide-slate-100">
-                                    <thead className="bg-slate-50/80 backdrop-blur-md">
-                                        <tr>
-                                            <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">Action</th>
-                                            <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-[88px] bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">Profile</th>
-                                            <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[140px]">Latin Name</th>
-                                            {isRecycleBin ? (<><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">ID</th><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th></>) : (
-                                                <>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[100px]">Gender</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[120px]">ID</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Skill</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Group Info</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Section</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Position</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Academic</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[120px]">DOB</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">POB</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Telegram</th>
-                                                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <th key={d} className="px-4 py-4 text-center text-xs font-extrabold text-slate-500 uppercase border-l border-slate-200/50 min-w-[100px] bg-slate-100/30">{d}</th>)}
-                                                </>
-                                            )}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {currentItems.map((emp, idx) => isRecycleBin ? 
-                                            <TrashRow key={emp.id} employee={emp} onRestore={onRestore} onPermanentDelete={onPermanentDelete} index={idx} /> : 
-                                            <EmployeeRow key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} onInlineUpdate={onInlineUpdate} index={idx} settings={settings} />
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            {/* --- PAGINATION FOR LIST VIEW --- */}
-                            <PaginationControls className="flex flex-col md:flex-row justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/50" />
-                        </div>
-                    )}
-                </>
             )}
-        </div>
+
+            {/* 2. MAIN CONTENT (ANIMATED) */}
+            <div className="space-y-6 animate-fade-in relative min-h-[500px]">
+                {/* Toolbar */}
+                <div className={`glass-panel p-4 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4 sticky top-0 z-20 transition-all duration-300 ${!showMobileSearch ? 'hidden md:flex' : 'flex'}`}>
+                    
+                    {/* Search Bar - Hidden on Mobile unless Toggled */}
+                    <div className={`relative w-full md:w-96 group transition-all duration-300 ${showMobileSearch ? 'block' : 'hidden md:block'}`}>
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
+                        <input type="text" className="block w-full pl-12 pr-4 py-3 border-none rounded-2xl bg-white/50 focus:bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ស្វែងរក..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    </div>
+
+                    <div className="flex items-center justify-between w-full md:w-auto gap-3">
+                        {!isRecycleBin && (
+                            <>
+                            {/* Hidden md:flex = Only show on Desktop */}
+                            <div className="hidden md:flex bg-white/50 p-1.5 rounded-xl items-center ring-1 ring-slate-200">
+                                <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
+                                <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
+                            </div>
+                            {/* Hidden md:flex = Create Button only on Desktop (Mobile uses FAB) */}
+                            <button onClick={onCreate} className="hidden md:flex flex-1 md:flex-none items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span className="hidden sm:inline">បង្កើតថ្មី</span><span className="sm:hidden">New</span></button>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">{[1, 2, 3].map(i => <div key={i} className="bg-white/50 h-64 rounded-3xl"></div>)}</div>
+                ) : filteredEmployees.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-white/40 rounded-3xl border-2 border-dashed border-slate-300">
+                        <div className="bg-slate-100 p-6 rounded-full mb-4 text-slate-400">{isRecycleBin ? <Trash2Icon className="h-10 w-10" /> : <SearchIcon className="h-10 w-10" />}</div>
+                        <h3 className="text-xl font-bold text-slate-700">មិនមានទិន្នន័យ</h3>
+                    </div>
+                ) : (
+                    <>
+                        {(viewMode === 'grid' && !isRecycleBin) ? (
+                            <>
+                                {/* --- GRID VIEW --- */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    {currentItems.map((emp, idx) => <EmployeeCard key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} index={idx} />)}
+                                </div>
+                                {/* --- PAGINATION FOR GRID VIEW --- */}
+                                <PaginationControls className="glass-panel p-4 rounded-2xl flex flex-col md:flex-row justify-between items-center bg-white/80 mt-6" />
+                            </>
+                        ) : (
+                            <div className="glass-panel rounded-3xl overflow-hidden pb-0 bg-white/80">
+                                {/* --- LIST VIEW --- */}
+                                <div ref={tableContainerRef} className="overflow-x-auto cursor-grab active:cursor-grabbing custom-scrollbar" onMouseDown={onMouseDown} onMouseLeave={onMouseLeave} onMouseUp={onMouseUp} onMouseMove={onMouseMove}>
+                                    <table className="min-w-full divide-y divide-slate-100">
+                                        <thead className="bg-slate-50/80 backdrop-blur-md">
+                                            <tr>
+                                                <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">Action</th>
+                                                <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-[88px] bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">Profile</th>
+                                                <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[140px]">Latin Name</th>
+                                                {isRecycleBin ? (<><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">ID</th><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th></>) : (
+                                                    <>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[100px]">Gender</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[120px]">ID</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Skill</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Group Info</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Section</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Position</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Academic</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[120px]">DOB</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">POB</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Telegram</th>
+                                                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <th key={d} className="px-4 py-4 text-center text-xs font-extrabold text-slate-500 uppercase border-l border-slate-200/50 min-w-[100px] bg-slate-100/30">{d}</th>)}
+                                                    </>
+                                                )}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {currentItems.map((emp, idx) => isRecycleBin ? 
+                                                <TrashRow key={emp.id} employee={emp} onRestore={onRestore} onPermanentDelete={onPermanentDelete} index={idx} /> : 
+                                                <EmployeeRow key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} onInlineUpdate={onInlineUpdate} index={idx} settings={settings} />
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                {/* --- PAGINATION FOR LIST VIEW --- */}
+                                <PaginationControls className="flex flex-col md:flex-row justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/50" />
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </>
     );
 };
 
