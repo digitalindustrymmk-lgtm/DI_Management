@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { db, auth } from './firebase';
-import { DatabaseIcon, LayoutGridIcon, UsersIcon, CheckSquareIcon, Trash2Icon, SettingsIcon, LogOutIcon, MenuIcon, BellIcon, SearchIcon, PlusIcon, ListIcon, Edit2Icon, UserIcon, SendIcon, ChevronLeftIcon, ChevronRightIcon, RotateCcwIcon, XIcon } from './components/Icons'; 
+import { DatabaseIcon, LayoutGridIcon, UsersIcon, CheckSquareIcon, Trash2Icon, SettingsIcon, LogOutIcon, MenuIcon, BellIcon, SearchIcon, PlusIcon, ListIcon, Edit2Icon, UserIcon, SendIcon, ChevronLeftIcon, ChevronRightIcon, RotateCcwIcon, XIcon, CheckIcon } from './components/Icons'; 
 import { ToastContainer, ConfirmModal, EditableCell } from './components/UI';
 import Dashboard from './views/Dashboard';
 import SettingsView from './views/SettingsView';
@@ -28,8 +28,21 @@ const useToast = () => {
 };
 
 // --- SUB-COMPONENTS (Card, Row, TrashRow) ---
-const EmployeeCard = memo(({ employee, onEdit, onDelete, index }) => (
-    <div className="group bg-white/70 backdrop-blur-md rounded-3xl border border-white/60 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-2 transition-all duration-300 overflow-hidden flex flex-col animate-fade-in" style={{ animationDelay: `${index * 50}ms` }} onDoubleClick={onEdit}>
+
+// 1. UPDATED: EmployeeCard now accepts isSelected and onToggleSelect
+const EmployeeCard = memo(({ employee, onEdit, onDelete, index, isSelected, onToggleSelect }) => (
+    <div className={`group relative bg-white/70 backdrop-blur-md rounded-3xl border shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 overflow-hidden flex flex-col animate-fade-in ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/50' : 'border-white/60'}`} style={{ animationDelay: `${index * 50}ms` }} onDoubleClick={onEdit}>
+        
+        {/* CHECKBOX FOR CARD */}
+        <div className="absolute top-3 left-3 z-20">
+            <input 
+                type="checkbox" 
+                checked={isSelected || false} 
+                onChange={(e) => { e.stopPropagation(); onToggleSelect(employee.id); }}
+                className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+            />
+        </div>
+
         <div className="p-6 flex flex-col items-center text-center relative">
             <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-indigo-50 to-blue-50 z-0"></div>
             <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-x-2 group-hover:translate-x-0">
@@ -62,15 +75,25 @@ const EmployeeCard = memo(({ employee, onEdit, onDelete, index }) => (
     </div>
 ));
 
-const EmployeeRow = memo(({ employee, onEdit, onDelete, onInlineUpdate, index, settings }) => (
-    <tr className="group hover:bg-indigo-50/30 transition-colors animate-fade-in border-b border-slate-100 last:border-0" onDoubleClick={onEdit}>
-        <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white/90 backdrop-blur-sm group-hover:bg-indigo-50/50 z-20 border-r border-slate-100">
-            <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0">
-                <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg transition-colors"><Edit2Icon className="h-4 w-4" /></button>
-                <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-rose-500 hover:bg-rose-100 p-2 rounded-lg transition-colors"><Trash2Icon className="h-4 w-4" /></button>
+// 2. UPDATED: EmployeeRow now accepts isSelected and onToggleSelect
+const EmployeeRow = memo(({ employee, onEdit, onDelete, onInlineUpdate, index, settings, isSelected, onToggleSelect }) => (
+    <tr className={`group transition-colors animate-fade-in border-b border-slate-100 last:border-0 ${isSelected ? 'bg-indigo-50' : 'hover:bg-indigo-50/30'}`} onDoubleClick={onEdit}>
+        <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white/90 backdrop-blur-sm z-20 border-r border-slate-100">
+            {/* CHECKBOX FOR ROW */}
+            <div className="flex items-center gap-3">
+                <input 
+                    type="checkbox" 
+                    checked={isSelected || false} 
+                    onChange={(e) => onToggleSelect(employee.id)}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+                />
+                <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0">
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg transition-colors"><Edit2Icon className="h-4 w-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-rose-500 hover:bg-rose-100 p-2 rounded-lg transition-colors"><Trash2Icon className="h-4 w-4" /></button>
+                </div>
             </div>
         </td>
-        <td className="px-4 py-3 whitespace-nowrap sticky left-[88px] bg-white/90 backdrop-blur-sm group-hover:bg-indigo-50/50 z-20 border-r border-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+        <td className="px-4 py-3 whitespace-nowrap sticky left-[88px] bg-white/90 backdrop-blur-sm z-20 border-r border-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
             <div className="flex items-center">
                 <div className="flex-shrink-0 h-10 w-10 rounded-full overflow-hidden shadow-sm ring-2 ring-white">
                     {employee.imageUrl ? <img className="h-full w-full object-cover" src={employee.imageUrl} alt="" /> : <div className="h-full w-full bg-slate-100 flex items-center justify-center text-slate-400"><UserIcon className="h-5 w-5" /></div>}
@@ -104,7 +127,7 @@ const EmployeeRow = memo(({ employee, onEdit, onDelete, onInlineUpdate, index, s
             return <td key={day} className="px-4 py-3 whitespace-nowrap text-center border-l border-slate-100 text-sm font-medium text-slate-700 bg-slate-50/30"><EditableCell value={employee[day]} onSave={(val) => onInlineUpdate(employee.id, `កាលវិភាគ/${dayKh}`, val)} options={settings?.schedules} /></td>
         })}
     </tr>
-), (prev, next) => prev.employee === next.employee && prev.index === next.index && prev.settings === next.settings);
+), (prev, next) => prev.employee === next.employee && prev.index === next.index && prev.settings === next.settings && prev.isSelected === next.isSelected);
 
 const TrashRow = memo(({ employee, onRestore, onPermanentDelete, index }) => (
     <tr className="group hover:bg-red-50/50 transition-colors animate-fade-in border-b border-slate-100">
@@ -134,18 +157,20 @@ const EmployeeListView = ({
     loading, 
     settings,
     isRecycleBin = false, 
-    isModalOpen, // UPDATED: Receive prop
+    isModalOpen,
     onEdit, 
     onDelete, 
     onRestore, 
     onPermanentDelete, 
     onInlineUpdate, 
-    onCreate 
+    onCreate,
+    onBulkDelete // NEW PROP
 }) => {
     const [viewMode, setViewMode] = useState(window.innerWidth < 768 ? 'grid' : 'list');
     const [searchTerm, setSearchTerm] = useState('');
     const [showMobileSearch, setShowMobileSearch] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
+    const [selectedIds, setSelectedIds] = useState(new Set()); // STATE FOR SELECTION
     const itemsPerPage = 50;
     
     useEffect(() => {
@@ -157,6 +182,11 @@ const EmployeeListView = ({
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // Clear selection when mode changes or recycle bin changes
+    useEffect(() => {
+        setSelectedIds(new Set());
+    }, [isRecycleBin]);
     
     const tableContainerRef = useRef(null);
     const isDragging = useRef(false);
@@ -180,6 +210,24 @@ const EmployeeListView = ({
 
     useEffect(() => setCurrentPage(1), [searchTerm]);
 
+    // --- SELECTION HANDLERS ---
+    const toggleSelect = (id) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === filteredEmployees.length && filteredEmployees.length > 0) {
+            setSelectedIds(new Set()); // Deselect all
+        } else {
+            setSelectedIds(new Set(filteredEmployees.map(e => e.id))); // Select all filtered
+        }
+    };
+
     const currentItems = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
     const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
 
@@ -198,9 +246,20 @@ const EmployeeListView = ({
 
     return (
         <>
-            {/* UPDATED: Hide buttons if Modal is Open */}
+            {/* MOBILE FLOATING ACTION BUTTONS */}
             {!isRecycleBin && !isModalOpen && (
                 <div className="md:hidden fixed bottom-6 right-6 flex flex-col gap-4 z-[100]">
+                    {/* BULK DELETE BUTTON (Mobile) */}
+                    {selectedIds.size > 0 && (
+                         <button 
+                            onClick={() => { onBulkDelete(Array.from(selectedIds)); setSelectedIds(new Set()); }}
+                            className="h-14 w-14 bg-red-600 text-white rounded-full flex items-center justify-center active:scale-95 transition-transform shadow-red-500/40 shadow-xl"
+                        >
+                            <span className="absolute -top-1 -right-1 bg-white text-red-600 text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center border border-red-100">{selectedIds.size}</span>
+                            <Trash2Icon className="h-6 w-6" />
+                        </button>
+                    )}
+
                     <button 
                         onClick={() => setShowMobileSearch(!showMobileSearch)} 
                         className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${showMobileSearch ? 'bg-slate-700 text-white rotate-90' : 'bg-white text-indigo-600 border border-indigo-100'}`}
@@ -230,10 +289,32 @@ const EmployeeListView = ({
                     <div className="flex items-center justify-between w-full md:w-auto gap-3">
                         {!isRecycleBin && (
                             <>
-                            <div className="hidden md:flex bg-white/50 p-1.5 rounded-xl items-center ring-1 ring-slate-200">
-                                <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
-                                <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
-                            </div>
+                            {/* BULK ACTIONS BAR (Desktop) */}
+                            {selectedIds.size > 0 ? (
+                                <div className="hidden md:flex items-center gap-3 bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-2xl animate-fade-in">
+                                    <span className="text-sm font-bold text-indigo-700">{selectedIds.size} Selected</span>
+                                    <button 
+                                        onClick={() => { onBulkDelete(Array.from(selectedIds)); setSelectedIds(new Set()); }}
+                                        className="flex items-center gap-2 bg-white text-red-600 px-3 py-1.5 rounded-xl text-sm font-bold border border-red-100 hover:bg-red-50 transition-colors"
+                                    >
+                                        <Trash2Icon className="h-4 w-4" /> Delete
+                                    </button>
+                                    <button onClick={() => setSelectedIds(new Set())} className="text-slate-400 hover:text-slate-600"><XIcon className="h-4 w-4" /></button>
+                                </div>
+                            ) : (
+                                <div className="hidden md:flex bg-white/50 p-1.5 rounded-xl items-center ring-1 ring-slate-200">
+                                    <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
+                                    <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
+                                </div>
+                            )}
+
+                            {/* Select All Button for Grid View (Desktop) */}
+                            {viewMode === 'grid' && (
+                                <button onClick={toggleSelectAll} className="hidden md:flex items-center justify-center p-3 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:bg-slate-50 transition-all" title="Select All">
+                                    <CheckSquareIcon className={`h-5 w-5 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'text-indigo-600' : ''}`} />
+                                </button>
+                            )}
+
                             <button onClick={onCreate} className="hidden md:flex flex-1 md:flex-none items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span className="hidden sm:inline">បង្កើតថ្មី</span><span className="sm:hidden">New</span></button>
                             </>
                         )}
@@ -252,7 +333,17 @@ const EmployeeListView = ({
                         {(viewMode === 'grid' && !isRecycleBin) ? (
                             <>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                    {currentItems.map((emp, idx) => <EmployeeCard key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} index={idx} />)}
+                                    {currentItems.map((emp, idx) => (
+                                        <EmployeeCard 
+                                            key={emp.id} 
+                                            employee={emp} 
+                                            onEdit={() => onEdit(emp)} 
+                                            onDelete={() => onDelete(emp.id)} 
+                                            index={idx}
+                                            isSelected={selectedIds.has(emp.id)} // PASS SELECTED
+                                            onToggleSelect={toggleSelect} // PASS TOGGLE
+                                        />
+                                    ))}
                                 </div>
                                 <PaginationControls className="glass-panel p-4 rounded-2xl flex flex-col md:flex-row justify-between items-center bg-white/80 mt-6" />
                             </>
@@ -262,7 +353,20 @@ const EmployeeListView = ({
                                     <table className="min-w-full divide-y divide-slate-100">
                                         <thead className="bg-slate-50/80 backdrop-blur-md">
                                             <tr>
-                                                <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">Action</th>
+                                                <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">
+                                                     {/* HEADER CHECKBOX */}
+                                                    {!isRecycleBin ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={selectedIds.size > 0 && selectedIds.size === filteredEmployees.length}
+                                                                onChange={toggleSelectAll}
+                                                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+                                                            />
+                                                            <span>Action</span>
+                                                        </div>
+                                                    ) : "Action"}
+                                                </th>
                                                 <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-[88px] bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">Profile</th>
                                                 <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[140px]">Latin Name</th>
                                                 {isRecycleBin ? (<><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">ID</th><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th></>) : (
@@ -285,7 +389,17 @@ const EmployeeListView = ({
                                         <tbody className="divide-y divide-slate-100">
                                             {currentItems.map((emp, idx) => isRecycleBin ? 
                                                 <TrashRow key={emp.id} employee={emp} onRestore={onRestore} onPermanentDelete={onPermanentDelete} index={idx} /> : 
-                                                <EmployeeRow key={emp.id} employee={emp} onEdit={() => onEdit(emp)} onDelete={() => onDelete(emp.id)} onInlineUpdate={onInlineUpdate} index={idx} settings={settings} />
+                                                <EmployeeRow 
+                                                    key={emp.id} 
+                                                    employee={emp} 
+                                                    onEdit={() => onEdit(emp)} 
+                                                    onDelete={() => onDelete(emp.id)} 
+                                                    onInlineUpdate={onInlineUpdate} 
+                                                    index={idx} 
+                                                    settings={settings}
+                                                    isSelected={selectedIds.has(emp.id)} // PASS SELECTED
+                                                    onToggleSelect={toggleSelect} // PASS TOGGLE
+                                                />
                                             )}
                                         </tbody>
                                     </table>
@@ -346,6 +460,36 @@ function App() {
     const initiateDelete = useCallback((id) => {
         const emp = employees.find(e => e.id === id);
         setConfirmDialog({ isOpen: true, type: 'danger', title: 'បញ្ជាក់ការលុប', message: `តើអ្នកពិតជាចង់លុប "${emp?.name}" ទៅកាន់ធុងសំរាមមែនទេ?`, onConfirm: async () => { try { await db.ref(`deleted_students/${emp.id}`).set({ ...emp.originalData, deletedAt: Date.now() }); await db.ref(`students/${emp.id}`).remove(); setConfirmDialog(prev => ({...prev, isOpen: false})); addToast("បានបញ្ជូនទៅធុងសំរាម", 'success'); } catch (error) { addToast("បរាជ័យក្នុងការលុប", 'error'); } } });
+    }, [employees]);
+
+    // NEW: Handle Bulk Delete
+    const handleBulkDelete = useCallback((ids) => {
+        if (!ids || ids.length === 0) return;
+        
+        setConfirmDialog({
+            isOpen: true,
+            type: 'danger',
+            title: 'បញ្ជាក់ការលុបជាក្រុម', // Bulk Delete Confirmation
+            message: `តើអ្នកប្រាកដជាចង់លុបបុគ្គលិកចំនួន ${ids.length} នាក់ ទៅកាន់ធុងសំរាមមែនទេ?`,
+            onConfirm: async () => {
+                try {
+                    const updates = {};
+                    ids.forEach(id => {
+                        const emp = employees.find(e => e.id === id);
+                        if (emp) {
+                            updates[`deleted_students/${id}`] = { ...emp.originalData, deletedAt: Date.now() };
+                            updates[`students/${id}`] = null;
+                        }
+                    });
+                    
+                    await db.ref().update(updates);
+                    setConfirmDialog(prev => ({...prev, isOpen: false}));
+                    addToast(`បានលុបចំនួន ${ids.length} នាក់ជោគជ័យ`, 'success');
+                } catch (error) {
+                    addToast("បរាជ័យក្នុងការលុបជាក្រុម", 'error');
+                }
+            }
+        });
     }, [employees]);
 
     const handleRestore = useCallback((employee) => {
@@ -425,11 +569,12 @@ function App() {
                                     employees={employees} 
                                     loading={loading}
                                     settings={settings}
-                                    isModalOpen={isModalOpen} /* UPDATED: Passed State Here */
+                                    isModalOpen={isModalOpen}
                                     onEdit={(emp) => { setCurrentEmployee(emp); setIsModalOpen(true); }}
                                     onDelete={initiateDelete}
                                     onInlineUpdate={handleInlineUpdate}
                                     onCreate={() => { setCurrentEmployee(null); setIsModalOpen(true); }}
+                                    onBulkDelete={handleBulkDelete} /* PASSED NEW HANDLER */
                                 />
                             } />
                             <Route path="/recycle-bin" element={
