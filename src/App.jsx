@@ -29,11 +29,8 @@ const useToast = () => {
 
 // --- SUB-COMPONENTS (Card, Row, TrashRow) ---
 
-// 1. UPDATED: EmployeeCard now accepts isSelected and onToggleSelect
 const EmployeeCard = memo(({ employee, onEdit, onDelete, index, isSelected, onToggleSelect }) => (
     <div className={`group relative bg-white/70 backdrop-blur-md rounded-3xl border shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 overflow-hidden flex flex-col animate-fade-in ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/50' : 'border-white/60'}`} style={{ animationDelay: `${index * 50}ms` }} onDoubleClick={onEdit}>
-        
-        {/* CHECKBOX FOR CARD */}
         <div className="absolute top-3 left-3 z-20">
             <input 
                 type="checkbox" 
@@ -42,7 +39,6 @@ const EmployeeCard = memo(({ employee, onEdit, onDelete, index, isSelected, onTo
                 className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
             />
         </div>
-
         <div className="p-6 flex flex-col items-center text-center relative">
             <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-indigo-50 to-blue-50 z-0"></div>
             <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-x-2 group-hover:translate-x-0">
@@ -75,11 +71,9 @@ const EmployeeCard = memo(({ employee, onEdit, onDelete, index, isSelected, onTo
     </div>
 ));
 
-// 2. UPDATED: EmployeeRow now accepts isSelected and onToggleSelect
 const EmployeeRow = memo(({ employee, onEdit, onDelete, onInlineUpdate, index, settings, isSelected, onToggleSelect }) => (
     <tr className={`group transition-colors animate-fade-in border-b border-slate-100 last:border-0 ${isSelected ? 'bg-indigo-50' : 'hover:bg-indigo-50/30'}`} onDoubleClick={onEdit}>
         <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white/90 backdrop-blur-sm z-20 border-r border-slate-100">
-            {/* CHECKBOX FOR ROW */}
             <div className="flex items-center gap-3">
                 <input 
                     type="checkbox" 
@@ -151,7 +145,6 @@ const TrashRow = memo(({ employee, onRestore, onPermanentDelete, index }) => (
     </tr>
 ));
 
-// --- COMPONENT: Encapsulated Employee List View ---
 const EmployeeListView = ({ 
     employees, 
     loading, 
@@ -164,13 +157,13 @@ const EmployeeListView = ({
     onPermanentDelete, 
     onInlineUpdate, 
     onCreate,
-    onBulkDelete // NEW PROP
+    onBulkDelete
 }) => {
     const [viewMode, setViewMode] = useState(window.innerWidth < 768 ? 'grid' : 'list');
     const [searchTerm, setSearchTerm] = useState('');
     const [showMobileSearch, setShowMobileSearch] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const [selectedIds, setSelectedIds] = useState(new Set()); // STATE FOR SELECTION
+    const [selectedIds, setSelectedIds] = useState(new Set());
     const itemsPerPage = 50;
     
     useEffect(() => {
@@ -183,7 +176,6 @@ const EmployeeListView = ({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Clear selection when mode changes or recycle bin changes
     useEffect(() => {
         setSelectedIds(new Set());
     }, [isRecycleBin]);
@@ -210,7 +202,6 @@ const EmployeeListView = ({
 
     useEffect(() => setCurrentPage(1), [searchTerm]);
 
-    // --- SELECTION HANDLERS ---
     const toggleSelect = (id) => {
         setSelectedIds(prev => {
             const next = new Set(prev);
@@ -222,9 +213,9 @@ const EmployeeListView = ({
 
     const toggleSelectAll = () => {
         if (selectedIds.size === filteredEmployees.length && filteredEmployees.length > 0) {
-            setSelectedIds(new Set()); // Deselect all
+            setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(filteredEmployees.map(e => e.id))); // Select all filtered
+            setSelectedIds(new Set(filteredEmployees.map(e => e.id)));
         }
     };
 
@@ -259,6 +250,15 @@ const EmployeeListView = ({
                             <Trash2Icon className="h-6 w-6" />
                         </button>
                     )}
+
+                    {/* SELECT ALL BUTTON (Mobile) - NEW! */}
+                    <button
+                        onClick={toggleSelectAll}
+                        className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`}
+                        style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}
+                    >
+                        <CheckSquareIcon className="h-6 w-6" />
+                    </button>
 
                     <button 
                         onClick={() => setShowMobileSearch(!showMobileSearch)} 
@@ -574,7 +574,7 @@ function App() {
                                     onDelete={initiateDelete}
                                     onInlineUpdate={handleInlineUpdate}
                                     onCreate={() => { setCurrentEmployee(null); setIsModalOpen(true); }}
-                                    onBulkDelete={handleBulkDelete} /* PASSED NEW HANDLER */
+                                    onBulkDelete={handleBulkDelete}
                                 />
                             } />
                             <Route path="/recycle-bin" element={
