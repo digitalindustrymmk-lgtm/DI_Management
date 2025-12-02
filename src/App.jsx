@@ -29,7 +29,8 @@ const useToast = () => {
 
 // --- LOGIN COMPONENT (NEW) ---
 const LoginView = ({ onLogin, loading, error }) => {
-    const [email, setEmail] = useState('');
+    // AUTO-FILL EMAIL HERE
+    const [email, setEmail] = useState('admin@dilistname.com');
     const [password, setPassword] = useState('');
   
     const handleSubmit = (e) => {
@@ -507,14 +508,17 @@ const EmployeeListView = ({
 // --- MAIN APP COMPONENT ---
 function App() {
     const [user, setUser] = useState(null);
-    const [adminProfile, setAdminProfile] = useState(null); // NEW: Admin Profile State
+    const [adminProfile, setAdminProfile] = useState(null); 
     const [loginLoading, setLoginLoading] = useState(false);
     const [loginError, setLoginError] = useState('');
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [employees, setEmployees] = useState([]);
     const [deletedEmployees, setDeletedEmployees] = useState([]);
     const [settings, setSettings] = useState({});
-    const [loading, setLoading] = useState(true);
+    
+    // START LOADING AS TRUE
+    const [loading, setLoading] = useState(true); 
+    
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentEmployee, setCurrentEmployee] = useState(null);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
@@ -523,16 +527,26 @@ function App() {
     // Firebase Auth State Listener & Persistence Logic
     useEffect(() => { 
         const unsubscribe = auth.onAuthStateChanged((u) => {
-            setUser(u);
-            if (u) {
-                // User is signed in, sync to localStorage (per request)
-                localStorage.setItem('user_session', JSON.stringify({ uid: u.uid, email: u.email }));
-            } else {
-                // User is signed out
+            // STRICT GATE: Check if user is anonymous or has no email
+            if (u && (u.isAnonymous || !u.email)) {
+                console.log("Blocking anonymous/incomplete user");
+                auth.signOut();
+                setUser(null);
                 localStorage.removeItem('user_session');
                 setAdminProfile(null);
+            } else {
+                setUser(u);
+                if (u) {
+                    // User is signed in with email, sync to localStorage
+                    localStorage.setItem('user_session', JSON.stringify({ uid: u.uid, email: u.email }));
+                } else {
+                    // User is signed out
+                    localStorage.removeItem('user_session');
+                    setAdminProfile(null);
+                }
             }
-            setLoading(false); // Stop loading once we know auth state
+            // CRITICAL: Stop loading only after we get the initial auth state
+            setLoading(false); 
         }); 
         return () => unsubscribe(); 
     }, []);
@@ -762,7 +776,19 @@ function App() {
     };
 
     // --- MAIN RENDER ---
-    // If not logged in, show LoginView. If logged in, show MainLayout.
+    // 1. SHOW LOADING SPINNER FIRST
+    if (loading) {
+        return (
+            <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-slate-400 text-sm font-medium animate-pulse">Loading HR Pro...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // 2. CHECK AUTH STATE
     return (
         <>
             {!user ? (
