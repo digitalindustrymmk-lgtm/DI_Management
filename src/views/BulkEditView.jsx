@@ -80,9 +80,15 @@ const MapPinIcon = (props) => (
   </svg>
 );
 
-// --- FIXED: SEARCH CONTROLS MOVED OUTSIDE ---
-// Moving this outside the component prevents it from re-rendering and losing focus when typing.
-const SearchControls = ({ searchTerm, setSearchTerm, filterClass, setFilterClass, filterYear, setFilterYear, uniqueClasses, uniqueYears }) => (
+// --- SEARCH CONTROLS (Moved Outside & Updated with Group Filter) ---
+const SearchControls = ({ 
+  searchTerm, setSearchTerm, 
+  filterClass, setFilterClass, 
+  filterYear, setFilterYear, 
+  filterGroup, setFilterGroup, // NEW: Group Filter Props
+  uniqueClasses, uniqueYears, 
+  uniqueGroups // NEW: Unique Groups List
+}) => (
   <>
     <div className="relative w-full md:w-64 group">
       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -102,10 +108,18 @@ const SearchControls = ({ searchTerm, setSearchTerm, filterClass, setFilterClass
         <FilterIcon className="h-4 w-4 text-indigo-500" />
         <span className="text-xs font-bold text-indigo-600">Filter:</span>
       </div>
+      
+      {/* NEW: Group Filter Dropdown */}
+      <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
+        <option value="">គ្រប់ក្រុម</option>
+        {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
+      </select>
+
       <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
         <option value="">គ្រប់ថ្នាក់</option>
         {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
+
       <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
         <option value="">គ្រប់ឆ្នាំសិក្សា</option>
         {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
@@ -122,13 +136,14 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
     // Search & Filter State
     const [filterClass, setFilterClass] = useState('');
     const [filterYear, setFilterYear] = useState('');
+    const [filterGroup, setFilterGroup] = useState(''); // NEW: Group State
     const [searchTerm, setSearchTerm] = useState('');
     const [showMobileSearch, setShowMobileSearch] = useState(false);
     
     // Edit & Modal State
     const [isApplying, setIsApplying] = useState(false);
     const [viewEmployee, setViewEmployee] = useState(null);
-    const [activeTab, setActiveTab] = useState('personal'); // 'personal', 'work', 'schedule'
+    const [activeTab, setActiveTab] = useState('personal'); 
     const [updateData, setUpdateData] = useState({ group: '', section: '', position: '', academicYear: '', mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' });
 
     const uniqueClasses = useMemo(() => {
@@ -141,10 +156,17 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
         return [...new Set(years)].sort();
     }, [employees]);
 
+    // NEW: Unique Groups
+    const uniqueGroups = useMemo(() => {
+        const groups = employees.map(emp => emp.group).filter(g => g && g.trim() !== '');
+        return [...new Set(groups)].sort();
+    }, [employees]);
+
     const filteredEmployees = useMemo(() => {
         return employees.filter(emp => {
             const matchClass = filterClass ? emp.class === filterClass : true;
             const matchYear = filterYear ? emp.academicYear === filterYear : true;
+            const matchGroup = filterGroup ? emp.group === filterGroup : true; // NEW: Group Match
             const isNumericId = /^\d+$/.test(emp.studentId || '');
 
             const cleanSearchTerm = searchTerm.toLowerCase().replace(/\s+/g, '');
@@ -156,9 +178,9 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                                 cleanLatinName.includes(cleanSearchTerm) || 
                                 cleanId.includes(cleanSearchTerm);
             
-            return matchClass && matchYear && isNumericId && matchSearch;
+            return matchClass && matchYear && matchGroup && isNumericId && matchSearch;
         });
-    }, [employees, filterClass, filterYear, searchTerm]);
+    }, [employees, filterClass, filterYear, filterGroup, searchTerm]);
 
     const handleSelectAll = (e) => {
         if (e.target.checked) {
@@ -251,7 +273,7 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
 
     return (
         <>
-            {/* 1. MAIN CONTENT (Wrapped separately to avoid transform conflicts with fixed modals) */}
+            {/* 1. MAIN CONTENT */}
             <div className="h-full flex flex-col relative animate-fade-in">
                 {/* DESKTOP HEADER (Hidden on Mobile) */}
                 <div className="hidden md:flex glass-panel p-4 rounded-3xl flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4 shrink-0">
@@ -263,8 +285,11 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                             setFilterClass={setFilterClass}
                             filterYear={filterYear}
                             setFilterYear={setFilterYear}
+                            filterGroup={filterGroup} // PASS GROUP
+                            setFilterGroup={setFilterGroup} // PASS GROUP SETTER
                             uniqueClasses={uniqueClasses}
                             uniqueYears={uniqueYears}
+                            uniqueGroups={uniqueGroups} // PASS UNIQUE GROUPS
                         />
                     </div>
                     <div className="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200">Total Found: <span className="text-indigo-600 text-sm">{filteredEmployees.length}</span></div>
@@ -296,7 +321,7 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(emp.id)} onChange={() => handleSelectOne(emp.id)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" /></td>
                                         <td className="px-4 py-3"><div className="h-10 w-10 rounded-full overflow-hidden border border-slate-200">{emp.imageUrl ? <img src={emp.imageUrl} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-slate-100 flex items-center justify-center text-slate-400"><UserIcon className="h-5 w-5" /></div>}</div></td>
                                         <td className="px-4 py-3"><div className="flex flex-col"><span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit mb-1">{emp.studentId}</span><span className="text-sm font-bold text-slate-700">{emp.name}</span><span className="text-xs text-slate-400">{emp.latinName}</span></div></td>
-                                        <td className="px-4 py-3"><div className="flex flex-wrap gap-2 text-xs"><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.class || 'No Class'}</span><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.academicYear || 'No Year'}</span></div></td>
+                                        <td className="px-4 py-3"><div className="flex flex-wrap gap-2 text-xs"><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.class || 'No Class'}</span><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.academicYear || 'No Year'}</span><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.group || 'No Group'}</span></div></td>
                                     </tr>
                                 ))}
                                 {filteredEmployees.length === 0 && <tr><td colSpan="4" className="text-center py-10 text-slate-400 italic">No employees found</td></tr>}
@@ -337,6 +362,7 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                                 <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
                                     <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-600 font-medium">{emp.class || 'No Class'}</span>
                                     <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-600 font-medium">{emp.academicYear || 'No Year'}</span>
+                                    <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-600 font-medium">{emp.group || 'No Group'}</span>
                                 </div>
                             </div>
                         ))}
@@ -401,8 +427,11 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                             setFilterClass={setFilterClass}
                             filterYear={filterYear}
                             setFilterYear={setFilterYear}
+                            filterGroup={filterGroup}
+                            setFilterGroup={setFilterGroup}
                             uniqueClasses={uniqueClasses}
                             uniqueYears={uniqueYears}
+                            uniqueGroups={uniqueGroups}
                         />
                         <button onClick={() => setShowMobileSearch(false)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold mt-2 shadow-lg shadow-indigo-200">បង្ហាញលទ្ធផល ({filteredEmployees.length})</button>
                     </div>

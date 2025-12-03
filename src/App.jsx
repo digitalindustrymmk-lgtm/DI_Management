@@ -9,6 +9,27 @@ import BulkEditView from './views/BulkEditView';
 import EmployeeFormModal from './components/EmployeeFormModal';
 import { ACADEMIC_YEARS, GENERATIONS, GENDER_OPTIONS, safeString } from './utils';
 
+// --- ICONS FOR SORT & FILTER ---
+const FilterIcon = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </svg>
+);
+
+const ArrowUpIcon = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M12 19V5" />
+    <path d="M5 12l7-7 7 7" />
+  </svg>
+);
+
+const ArrowDownIcon = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M12 5v14" />
+    <path d="M19 12l-7 7-7-7" />
+  </svg>
+);
+
 // --- HELPER: SMART SEARCH NORMALIZER ---
 const normalizeString = (str) => {
     if (!str) return '';
@@ -116,7 +137,93 @@ const LoginView = ({ onLogin, loading, error }) => {
     );
 };
 
-// --- SUB-COMPONENTS (Card, Row, TrashRow) ---
+// --- COMPONENT: CENTER FIXED SORT OPTION MODAL ---
+const SortOptionsModal = ({ isOpen, onClose, sortData, onConfirmSort }) => {
+    if (!isOpen || !sortData) return null;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div 
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
+                onClick={onClose}
+            ></div>
+
+            {/* Modal Content */}
+            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100 animate-fade-in border border-white/20">
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-800">Sort By</h3>
+                            <p className="text-sm text-indigo-500 font-medium">{sortData.label}</p>
+                        </div>
+                        <button onClick={onClose} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-500 transition-colors">
+                            <XIcon className="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    <div className="space-y-3">
+                        <button 
+                            onClick={() => onConfirmSort(sortData.key, 'asc')}
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${sortData.currentDirection === 'asc' && sortData.currentKey === sortData.key ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500 text-indigo-700' : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-slate-50 text-slate-700'}`}
+                        >
+                            <span className="font-bold flex items-center gap-2">
+                                <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600"><ArrowUpIcon className="h-4 w-4" /></div>
+                                Ascending (A-Z / 0-9)
+                            </span>
+                            {sortData.currentDirection === 'asc' && sortData.currentKey === sortData.key && <CheckIcon className="h-5 w-5 text-indigo-600" />}
+                        </button>
+
+                        <button 
+                            onClick={() => onConfirmSort(sortData.key, 'desc')}
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${sortData.currentDirection === 'desc' && sortData.currentKey === sortData.key ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500 text-indigo-700' : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-slate-50 text-slate-700'}`}
+                        >
+                            <span className="font-bold flex items-center gap-2">
+                                <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600"><ArrowDownIcon className="h-4 w-4" /></div>
+                                Descending (Z-A / 9-0)
+                            </span>
+                            {sortData.currentDirection === 'desc' && sortData.currentKey === sortData.key && <CheckIcon className="h-5 w-5 text-indigo-600" />}
+                        </button>
+
+                        <div className="border-t border-slate-100 my-4"></div>
+
+                        <button 
+                            onClick={() => onConfirmSort(sortData.key, null, true)} // Clear sort
+                            className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl bg-slate-50 text-slate-500 font-bold hover:bg-red-50 hover:text-red-500 transition-colors"
+                        >
+                            <RotateCcwIcon className="h-4 w-4" />
+                            Reset / Clear Sort
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- UPDATED SUB-COMPONENT: HEADER ---
+const SortableHeader = ({ label, sortKey, currentSort, onOpenSort, className = "" }) => (
+    <th 
+        className={`px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group select-none ${className}`}
+        onClick={() => onOpenSort(sortKey, label)}
+    >
+        <div className="flex items-center gap-1.5 justify-between">
+            <div className="flex items-center gap-1.5">
+                {label}
+                <span className="text-slate-400 flex flex-col">
+                    {currentSort.key === sortKey ? (
+                        currentSort.direction === 'asc' ? <ArrowUpIcon className="h-3 w-3 text-indigo-600" /> : <ArrowDownIcon className="h-3 w-3 text-indigo-600" />
+                    ) : (
+                        <div className="opacity-0 group-hover:opacity-50 transition-opacity">
+                           <ArrowUpIcon className="h-2 w-2 mb-[-2px]" />
+                           <ArrowDownIcon className="h-2 w-2" />
+                        </div>
+                    )}
+                </span>
+            </div>
+        </div>
+    </th>
+);
 
 const EmployeeCard = memo(({ employee, onEdit, onDelete, index, isSelected, onToggleSelect }) => (
     <div className={`group relative bg-white/70 backdrop-blur-md rounded-3xl border shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 overflow-hidden flex flex-col animate-fade-in ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/50' : 'border-white/60'}`} style={{ animationDelay: `${index * 50}ms` }} onDoubleClick={onEdit}>
@@ -188,12 +295,8 @@ const EmployeeRow = memo(({ employee, onEdit, onDelete, onInlineUpdate, index, s
         <td className="px-4 py-3 whitespace-nowrap text-sm"><EditableCell value={employee.gender} onSave={(val) => onInlineUpdate(employee.id, 'ភេទ', val)} options={GENDER_OPTIONS} className={`font-semibold ${employee.gender === 'ស្រី' ? 'text-pink-500' : 'text-indigo-500'}`} /></td>
         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 font-mono"><div className="bg-slate-100 px-2 py-1 rounded text-center text-xs font-bold text-slate-700"><EditableCell value={employee.studentId} onSave={(val) => onInlineUpdate(employee.id, 'អត្តលេខ', val)} /></div></td>
         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600"><EditableCell value={employee.skill} onSave={(val) => onInlineUpdate(employee.id, 'ជំនាញ', val)} options={settings?.skills} /></td>
-        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">
-            <div className="flex flex-col">
-                <span className="font-semibold text-slate-700"><EditableCell value={employee.group} onSave={(val) => onInlineUpdate(employee.id, 'ក្រុម', val)} options={settings?.groups} /></span>
-                <span className="text-[10px] text-slate-400"><EditableCell value={employee.class} onSave={(val) => onInlineUpdate(employee.id, 'ថ្នាក់', val)} options={settings?.classes} /></span>
-            </div>
-        </td>
+        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 font-semibold text-slate-700"><EditableCell value={employee.group} onSave={(val) => onInlineUpdate(employee.id, 'ក្រុម', val)} options={settings?.groups} /></td>
+        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 text-[10px] text-slate-400"><EditableCell value={employee.class} onSave={(val) => onInlineUpdate(employee.id, 'ថ្នាក់', val)} options={settings?.classes} /></td>
         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600"><EditableCell value={employee.section} onSave={(val) => onInlineUpdate(employee.id, 'ផ្នែកការងារ', val)} options={settings?.sections} /></td>
         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600"><div className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded border border-indigo-100 text-xs font-medium text-center"><EditableCell value={employee.position} onSave={(val) => onInlineUpdate(employee.id, 'តួនាទី', val)} options={settings?.positions} /></div></td>
         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">
@@ -253,6 +356,16 @@ const EmployeeListView = ({
     const [showMobileSearch, setShowMobileSearch] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedIds, setSelectedIds] = useState(new Set());
+    
+    // --- FILTERS & SORTING STATE ---
+    const [filterGroup, setFilterGroup] = useState('');
+    const [filterClass, setFilterClass] = useState('');
+    const [filterYear, setFilterYear] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+    // --- SORT MODAL STATE ---
+    const [sortModalData, setSortModalData] = useState(null); 
+
     const itemsPerPage = 50;
     
     useEffect(() => {
@@ -279,17 +392,91 @@ const EmployeeListView = ({
     const onMouseUp = () => { isDragging.current = false; if(tableContainerRef.current) tableContainerRef.current.classList.remove('cursor-grabbing'); };
     const onMouseMove = (e) => { if (!isDragging.current) return; e.preventDefault(); if(tableContainerRef.current) { const x = e.pageX - tableContainerRef.current.offsetLeft; const walk = (x - startX.current) * 2; tableContainerRef.current.scrollLeft = scrollLeft.current - walk; } };
 
-    const filteredEmployees = useMemo(() => {
-        if (!searchTerm) return employees;
-        const term = normalizeString(searchTerm);
-        return employees.filter(emp => 
-            normalizeString(emp.name).includes(term) || 
-            normalizeString(emp.latinName).includes(term) || 
-            normalizeString(emp.studentId).includes(term)
-        );
-    }, [employees, searchTerm]);
+    // Derived Unique Values for Filters
+    const uniqueGroups = useMemo(() => {
+        const groups = employees.map(emp => emp.group).filter(g => g && g.trim() !== '');
+        return [...new Set(groups)].sort();
+    }, [employees]);
 
-    useEffect(() => setCurrentPage(1), [searchTerm]);
+    const uniqueClasses = useMemo(() => {
+        const classes = employees.map(emp => emp.class).filter(c => c && c.trim() !== '');
+        return [...new Set(classes)].sort();
+    }, [employees]);
+
+    const uniqueYears = useMemo(() => {
+        const years = employees.map(emp => emp.academicYear).filter(y => y && y.trim() !== '');
+        return [...new Set(years)].sort();
+    }, [employees]);
+
+    // Filtering Logic
+    const filteredEmployees = useMemo(() => {
+        return employees.filter(emp => {
+            const matchesSearch = !searchTerm || 
+                normalizeString(emp.name).includes(normalizeString(searchTerm)) || 
+                normalizeString(emp.latinName).includes(normalizeString(searchTerm)) || 
+                normalizeString(emp.studentId).includes(normalizeString(searchTerm));
+            
+            const matchesGroup = !filterGroup || emp.group === filterGroup;
+            const matchesClass = !filterClass || emp.class === filterClass;
+            const matchesYear = !filterYear || emp.academicYear === filterYear;
+
+            return matchesSearch && matchesGroup && matchesClass && matchesYear;
+        });
+    }, [employees, searchTerm, filterGroup, filterClass, filterYear]);
+
+    // --- UPDATED SORTING LOGIC ---
+    const sortedEmployees = useMemo(() => {
+        let sortableItems = [...filteredEmployees];
+        if (sortConfig.key !== null) {
+            sortableItems.sort((a, b) => {
+                const valA = a[sortConfig.key] ? String(a[sortConfig.key]) : '';
+                const valB = b[sortConfig.key] ? String(b[sortConfig.key]) : '';
+                
+                // 1. Natural Sort for ID (e.g. 2 before 10)
+                if (sortConfig.key === 'studentId') {
+                    // 'numeric: true' is the key here
+                    return sortConfig.direction === 'asc' 
+                        ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+                        : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+                }
+
+                // 2. Khmer Sort for Name (Primary Name field)
+                // 'km' forces Khmer locale sorting rules
+                if (sortConfig.key === 'name') {
+                    return sortConfig.direction === 'asc'
+                        ? valA.localeCompare(valB, 'km')
+                        : valB.localeCompare(valA, 'km');
+                }
+
+                // 3. Default Sort (Latin Name, etc.)
+                return sortConfig.direction === 'asc'
+                    ? valA.localeCompare(valB, 'en', { sensitivity: 'base' })
+                    : valB.localeCompare(valA, 'en', { sensitivity: 'base' });
+            });
+        }
+        return sortableItems;
+    }, [filteredEmployees, sortConfig]);
+
+    // --- HANDLE SORT MODAL ---
+    const handleOpenSortModal = (key, label) => {
+        setSortModalData({ 
+            key, 
+            label, 
+            currentKey: sortConfig.key, 
+            currentDirection: sortConfig.direction 
+        });
+    };
+
+    const handleConfirmSort = (key, direction, clear = false) => {
+        if (clear) {
+             setSortConfig({ key: null, direction: 'asc' });
+        } else {
+             setSortConfig({ key, direction });
+        }
+        setSortModalData(null); 
+    };
+
+    useEffect(() => setCurrentPage(1), [searchTerm, filterGroup, filterClass, filterYear]);
 
     const toggleSelect = (id) => {
         setSelectedIds(prev => {
@@ -308,13 +495,13 @@ const EmployeeListView = ({
         }
     };
 
-    const currentItems = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+    const currentItems = sortedEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const totalPages = Math.ceil(sortedEmployees.length / itemsPerPage);
 
     const PaginationControls = ({ className }) => (
         <div className={className}>
             <div className="text-xs font-medium text-slate-500 mb-2 md:mb-0">
-                Showing {filteredEmployees.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} to {Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length}
+                Showing {sortedEmployees.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} to {Math.min(currentPage * itemsPerPage, sortedEmployees.length)} of {sortedEmployees.length}
             </div>
             <div className="flex gap-2">
                 <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 shadow-sm transition-all active:scale-95"><ChevronLeftIcon className="h-4 w-4" /></button>
@@ -326,11 +513,16 @@ const EmployeeListView = ({
 
     return (
         <>
-            {/* MOBILE FLOATING ACTION BUTTONS */}
+            <SortOptionsModal 
+                isOpen={!!sortModalData} 
+                sortData={sortModalData} 
+                onClose={() => setSortModalData(null)} 
+                onConfirmSort={handleConfirmSort} 
+            />
+
             {!isRecycleBin && !isModalOpen && (
-                <div className="md:hidden fixed bottom-6 right-6 flex flex-col gap-4 z-[100]">
-                    {/* BULK DELETE BUTTON (Mobile) */}
-                    {selectedIds.size > 0 && (
+                <div className="md:hidden fixed bottom-6 right-6 flex flex-col gap-4 z-[90]">
+                     {selectedIds.size > 0 && (
                           <button 
                             onClick={() => { onBulkDelete(Array.from(selectedIds)); setSelectedIds(new Set()); }}
                             className="h-14 w-14 bg-red-600 text-white rounded-full flex items-center justify-center active:scale-95 transition-transform shadow-red-500/40 shadow-xl"
@@ -339,46 +531,70 @@ const EmployeeListView = ({
                             <Trash2Icon className="h-6 w-6" />
                         </button>
                     )}
-
-                    {/* SELECT ALL BUTTON (Mobile) */}
-                    <button
-                        onClick={toggleSelectAll}
-                        className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`}
-                        style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                    >
-                        <CheckSquareIcon className="h-6 w-6" />
-                    </button>
-
-                    <button 
-                        onClick={() => setShowMobileSearch(!showMobileSearch)} 
-                        className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${showMobileSearch ? 'bg-slate-700 text-white rotate-90' : 'bg-white text-indigo-600 border border-indigo-100'}`}
-                        style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                    >
-                        {showMobileSearch ? <PlusIcon className="h-6 w-6 rotate-45" /> : <SearchIcon className="h-6 w-6" />}
-                    </button>
-
-                    <button 
-                        onClick={onCreate} 
-                        className="h-14 w-14 bg-indigo-600 text-white rounded-full flex items-center justify-center active:scale-95 transition-transform"
-                        style={{ boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.5)' }}
-                    >
-                        <PlusIcon className="h-7 w-7" />
-                    </button>
+                    <button onClick={toggleSelectAll} className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`} style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}><CheckSquareIcon className="h-6 w-6" /></button>
+                    <button onClick={() => setShowMobileSearch(!showMobileSearch)} className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${showMobileSearch ? 'bg-slate-700 text-white rotate-90' : 'bg-white text-indigo-600 border border-indigo-100'}`} style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}>{showMobileSearch ? <PlusIcon className="h-6 w-6 rotate-45" /> : <SearchIcon className="h-6 w-6" />}</button>
+                    <button onClick={onCreate} className="h-14 w-14 bg-indigo-600 text-white rounded-full flex items-center justify-center active:scale-95 transition-transform" style={{ boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.5)' }}><PlusIcon className="h-7 w-7" /></button>
                 </div>
             )}
+
+            <div className={`md:hidden fixed inset-0 z-[60] bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMobileSearch ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileSearch(false)}>
+                <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-5 shadow-2xl transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : 'translate-y-full'}`} onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-slate-700 text-lg">Search & Filter</h3>
+                        <button onClick={() => setShowMobileSearch(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200"><XIcon className="h-5 w-5" /></button>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                        <div className="relative w-full group">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><SearchIcon className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
+                            <input type="text" className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200" placeholder="Search name, ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                            <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none">
+                                <option value="">All Groups</option>
+                                {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                            <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none">
+                                <option value="">All Classes</option>
+                                {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none col-span-2">
+                                <option value="">All Academic Years</option>
+                                {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                        </div>
+
+                        <button onClick={() => setShowMobileSearch(false)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold mt-2 shadow-lg shadow-indigo-200">Show Results ({filteredEmployees.length})</button>
+                    </div>
+                </div>
+            </div>
 
             <div className="space-y-6 animate-fade-in relative min-h-[500px]">
                 <div className={`glass-panel p-4 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4 sticky top-0 z-20 transition-all duration-300 ${!showMobileSearch ? 'hidden md:flex' : 'flex'}`}>
                     
-                    <div className={`relative w-full md:w-96 group transition-all duration-300 ${showMobileSearch ? 'block' : 'hidden md:block'}`}>
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
-                        <input type="text" className="block w-full pl-12 pr-4 py-3 border-none rounded-2xl bg-white/50 focus:bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ស្វែងរក..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    <div className={`flex flex-1 gap-3 items-center w-full transition-all duration-300 ${showMobileSearch ? 'block' : 'hidden md:flex'}`}>
+                        <div className="relative w-full md:w-64 group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
+                            <input type="text" className="block w-full pl-12 pr-4 py-2.5 border-none rounded-2xl bg-white/50 focus:bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-400 font-medium text-sm" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        </div>
+
+                        <div className="hidden xl:flex items-center gap-2">
+                            <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50/50 rounded-xl border border-indigo-100 whitespace-nowrap">
+                                <FilterIcon className="h-4 w-4 text-indigo-500" />
+                                <span className="text-xs font-bold text-indigo-600">Filter:</span>
+                            </div>
+                            <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="py-2 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-200 min-w-[100px] hover:border-indigo-300 transition-colors cursor-pointer"><option value="">Group</option>{uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}</select>
+                            <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="py-2 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-200 min-w-[100px] hover:border-indigo-300 transition-colors cursor-pointer"><option value="">Class</option>{uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                            <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="py-2 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px] hover:border-indigo-300 transition-colors cursor-pointer"><option value="">Year</option>{uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                            {(filterGroup || filterClass || filterYear) && (
+                                <button onClick={() => { setFilterGroup(''); setFilterClass(''); setFilterYear(''); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Reset Filters"><RotateCcwIcon className="h-4 w-4" /></button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="flex items-center justify-between w-full md:w-auto gap-3">
                         {!isRecycleBin && (
                             <>
-                            {/* BULK ACTIONS BAR (Desktop) */}
                             {selectedIds.size > 0 ? (
                                 <div className="hidden md:flex items-center gap-3 bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-2xl animate-fade-in">
                                     <span className="text-sm font-bold text-indigo-700">{selectedIds.size} Selected</span>
@@ -396,14 +612,11 @@ const EmployeeListView = ({
                                     <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
                                 </div>
                             )}
-
-                            {/* Select All Button for Grid View (Desktop) */}
                             {viewMode === 'grid' && (
                                 <button onClick={toggleSelectAll} className="hidden md:flex items-center justify-center p-3 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:bg-slate-50 transition-all" title="Select All">
                                     <CheckSquareIcon className={`h-5 w-5 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'text-indigo-600' : ''}`} />
                                 </button>
                             )}
-
                             <button onClick={onCreate} className="hidden md:flex flex-1 md:flex-none items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span className="hidden sm:inline">បង្កើតថ្មី</span><span className="sm:hidden">New</span></button>
                             </>
                         )}
@@ -429,8 +642,8 @@ const EmployeeListView = ({
                                             onEdit={() => onEdit(emp)} 
                                             onDelete={() => onDelete(emp.id)} 
                                             index={idx}
-                                            isSelected={selectedIds.has(emp.id)} // PASS SELECTED
-                                            onToggleSelect={toggleSelect} // PASS TOGGLE
+                                            isSelected={selectedIds.has(emp.id)} 
+                                            onToggleSelect={toggleSelect} 
                                         />
                                     ))}
                                 </div>
@@ -443,7 +656,6 @@ const EmployeeListView = ({
                                         <thead className="bg-slate-50/80 backdrop-blur-md">
                                             <tr>
                                                 <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">
-                                                    {/* HEADER CHECKBOX */}
                                                     {!isRecycleBin ? (
                                                         <div className="flex items-center gap-2">
                                                             <input 
@@ -456,19 +668,32 @@ const EmployeeListView = ({
                                                         </div>
                                                     ) : "Action"}
                                                 </th>
-                                                <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-[88px] bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">Profile</th>
-                                                <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[140px]">Latin Name</th>
+                                                
+                                                {/* --- UPDATED: Sticky + Sortable Header for Khmer Name --- */}
+                                                <th className="px-0 py-0 sticky left-[88px] bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)] p-0">
+                                                     <SortableHeader 
+                                                        label="Name / Profile" 
+                                                        sortKey="name" 
+                                                        currentSort={sortConfig} 
+                                                        onOpenSort={handleOpenSortModal} 
+                                                        className="h-full bg-slate-50"
+                                                    />
+                                                </th>
+                                                
+                                                <SortableHeader label="Latin Name" sortKey="latinName" currentSort={sortConfig} onOpenSort={handleOpenSortModal} />
+                                                
                                                 {isRecycleBin ? (<><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">ID</th><th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th></>) : (
                                                     <>
-                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[100px]">Gender</th>
-                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[120px]">ID</th>
-                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Skill</th>
-                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Group Info</th>
-                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Section</th>
-                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Position</th>
-                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Academic</th>
-                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[120px]">DOB</th>
-                                                        <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">POB</th>
+                                                        <SortableHeader label="Gender" sortKey="gender" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[100px]" />
+                                                        <SortableHeader label="ID" sortKey="studentId" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[120px]" />
+                                                        <SortableHeader label="Skill" sortKey="skill" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[150px]" />
+                                                        <SortableHeader label="Group" sortKey="group" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[100px]" />
+                                                        <SortableHeader label="Class" sortKey="class" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[100px]" />
+                                                        <SortableHeader label="Section" sortKey="section" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[150px]" />
+                                                        <SortableHeader label="Position" sortKey="position" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[150px]" />
+                                                        <SortableHeader label="Academic" sortKey="academicYear" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[150px]" />
+                                                        <SortableHeader label="DOB" sortKey="dob" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[120px]" />
+                                                        <SortableHeader label="POB" sortKey="pob" currentSort={sortConfig} onOpenSort={handleOpenSortModal} className="min-w-[150px]" />
                                                         <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider min-w-[150px]">Telegram</th>
                                                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <th key={d} className="px-4 py-4 text-center text-xs font-extrabold text-slate-500 uppercase border-l border-slate-200/50 min-w-[100px] bg-slate-100/30">{d}</th>)}
                                                     </>
@@ -486,8 +711,8 @@ const EmployeeListView = ({
                                                     onInlineUpdate={onInlineUpdate} 
                                                     index={idx} 
                                                     settings={settings}
-                                                    isSelected={selectedIds.has(emp.id)} // PASS SELECTED
-                                                    onToggleSelect={toggleSelect} // PASS TOGGLE
+                                                    isSelected={selectedIds.has(emp.id)} 
+                                                    onToggleSelect={toggleSelect} 
                                                 />
                                             )}
                                         </tbody>
@@ -504,7 +729,6 @@ const EmployeeListView = ({
 };
 
 // --- EXTRACTED COMPONENTS (Sidebar & Header) ---
-// Moving these outside App ensures they don't re-render/unmount when App state changes (like opening/closing a modal).
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen, adminProfile, user, handleLogout }) => {
     return (
