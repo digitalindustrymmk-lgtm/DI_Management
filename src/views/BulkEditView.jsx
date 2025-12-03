@@ -80,6 +80,40 @@ const MapPinIcon = (props) => (
   </svg>
 );
 
+// --- FIXED: SEARCH CONTROLS MOVED OUTSIDE ---
+// Moving this outside the component prevents it from re-rendering and losing focus when typing.
+const SearchControls = ({ searchTerm, setSearchTerm, filterClass, setFilterClass, filterYear, setFilterYear, uniqueClasses, uniqueYears }) => (
+  <>
+    <div className="relative w-full md:w-64 group">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <SearchIcon className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+      </div>
+      <input 
+        type="text" 
+        className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 transition-all placeholder:text-slate-400" 
+        placeholder="ស្វែងរក..." 
+        value={searchTerm} 
+        onChange={(e) => setSearchTerm(e.target.value)} 
+      />
+    </div>
+    
+    <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+      <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50/50 rounded-xl border border-indigo-100 whitespace-nowrap">
+        <FilterIcon className="h-4 w-4 text-indigo-500" />
+        <span className="text-xs font-bold text-indigo-600">Filter:</span>
+      </div>
+      <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
+        <option value="">គ្រប់ថ្នាក់</option>
+        {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+      <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
+        <option value="">គ្រប់ឆ្នាំសិក្សា</option>
+        {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+      </select>
+    </div>
+  </>
+);
+
 // --- MAIN COMPONENT ---
 
 export default function BulkEditView({ db, employees, settings, addToast, setConfirmDialog }) {
@@ -215,28 +249,6 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
         </div>
     );
 
-    // Reusable Search Component
-    const SearchControls = () => (
-        <>
-            <div className="relative w-full md:w-64 group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><SearchIcon className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
-                <input type="text" className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 transition-all placeholder:text-slate-400" placeholder="ស្វែងរក..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
-            
-            <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-                <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50/50 rounded-xl border border-indigo-100 whitespace-nowrap"><FilterIcon className="h-4 w-4 text-indigo-500" /><span className="text-xs font-bold text-indigo-600">Filter:</span></div>
-                <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
-                    <option value="">គ្រប់ថ្នាក់</option>
-                    {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
-                    <option value="">គ្រប់ឆ្នាំសិក្សា</option>
-                    {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-            </div>
-        </>
-    );
-
     return (
         <>
             {/* 1. MAIN CONTENT (Wrapped separately to avoid transform conflicts with fixed modals) */}
@@ -244,7 +256,16 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                 {/* DESKTOP HEADER (Hidden on Mobile) */}
                 <div className="hidden md:flex glass-panel p-4 rounded-3xl flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4 shrink-0">
                     <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
-                        <SearchControls />
+                        <SearchControls 
+                            searchTerm={searchTerm}
+                            setSearchTerm={setSearchTerm}
+                            filterClass={filterClass}
+                            setFilterClass={setFilterClass}
+                            filterYear={filterYear}
+                            setFilterYear={setFilterYear}
+                            uniqueClasses={uniqueClasses}
+                            uniqueYears={uniqueYears}
+                        />
                     </div>
                     <div className="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200">Total Found: <span className="text-indigo-600 text-sm">{filteredEmployees.length}</span></div>
                 </div>
@@ -373,7 +394,16 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                         <button onClick={() => setShowMobileSearch(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200"><XIcon className="h-5 w-5" /></button>
                     </div>
                     <div className="flex flex-col gap-4">
-                        <SearchControls />
+                        <SearchControls 
+                            searchTerm={searchTerm}
+                            setSearchTerm={setSearchTerm}
+                            filterClass={filterClass}
+                            setFilterClass={setFilterClass}
+                            filterYear={filterYear}
+                            setFilterYear={setFilterYear}
+                            uniqueClasses={uniqueClasses}
+                            uniqueYears={uniqueYears}
+                        />
                         <button onClick={() => setShowMobileSearch(false)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold mt-2 shadow-lg shadow-indigo-200">បង្ហាញលទ្ធផល ({filteredEmployees.length})</button>
                     </div>
                 </div>
