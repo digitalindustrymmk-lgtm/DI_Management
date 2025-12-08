@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { 
+    XIcon, CameraIcon, UploadIcon, UserIcon, BriefcaseIcon, 
+    CalendarIcon, ChevronDownIcon, Loader2Icon, CheckCircleIcon 
+} from './Icons';
 
-// --- INLINED UTILS (To ensure compilation) ---
-const ACADEMIC_YEARS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027"];
-const GENERATIONS = ["Gen 1", "Gen 2", "Gen 3", "Gen 4", "Gen 5", "Gen 6"];
+// --- UPDATED CONSTANTS TO MATCH YOUR SCREENSHOT DATA ---
+// Added "ឆ្នាំទី១", "ឆ្នាំទី២" etc. so the dropdown can catch the data
+const ACADEMIC_YEARS = [
+    "2023-2024", "2024-2025", "2025-2026", "2026-2027", 
+    "ឆ្នាំទី១", "ឆ្នាំទី២", "ឆ្នាំទី៣", "ឆ្នាំទី៤" 
+];
 
-// --- INLINED ICONS ---
-const XIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
-const CameraIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
-const UploadIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>;
-const UserIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
-const BriefcaseIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>;
-const CalendarIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>;
-const ChevronDownIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m6 9 6 6 6-6"/></svg>;
-const Loader2Icon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
-const CheckCircleIcon = (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+// Added "ទី១", "ទី២" etc. to match the "Gen: ទី៣" in your image
+const GENERATIONS = [
+    "Gen 1", "Gen 2", "Gen 3", "Gen 4", "Gen 5", "Gen 6",
+    "ទី១", "ទី២", "ទី៣", "ទី៤", "ទី៥", "ទី៦"
+];
 
 // --- CLOUDINARY CONFIGURATION ---
 const CLOUD_NAME = "dsruankj0"; 
@@ -25,37 +27,64 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
         name: '', latinName: '', gender: 'ប្រុស', dob: '', pob: '', 
         studentId: '', academicYear: '', generation: '', group: '', 
         class: '', skill: '', section: '', position: '', telegram: '', 
-        imageUrl: '', // This stores the URL from Database
+        imageUrl: '',
         mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' 
     });
     
     const [loading, setLoading] = useState(false);
-    
-    // State for local preview and the actual file to upload
     const [previewUrl, setPreviewUrl] = useState('');
-    const [imageFile, setImageFile] = useState(null); // Stores the raw file object
+    const [imageFile, setImageFile] = useState(null); 
 
-    // Load employee data if editing
+    // --- EFFECT: LOAD DATA INTO FORM ---
     useEffect(() => { 
-        if (employee) { 
-            setFormData({ ...employee }); 
-            setPreviewUrl(employee.imageUrl || ''); 
-            setImageFile(null); // Reset file on load
-        } else {
-            // Reset for new entry
-            setPreviewUrl('');
-            setImageFile(null);
-            setFormData({ 
-                name: '', latinName: '', gender: 'ប្រុស', dob: '', pob: '', 
-                studentId: '', academicYear: '', generation: '', group: '', 
-                class: '', skill: '', section: '', position: '', telegram: '', 
-                imageUrl: '', 
-                mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' 
-            });
+        if (isOpen) {
+            if (employee) { 
+                // !!! DEBUG: Check the console to see exactly what data is coming in
+                console.log("Editing Employee Data:", employee);
+
+                setFormData({ 
+                    name: employee.name || '', 
+                    latinName: employee.latinName || '', 
+                    gender: employee.gender || 'ប្រុស', 
+                    dob: employee.dob || '', 
+                    pob: employee.pob || '', 
+                    studentId: employee.studentId || '', 
+                    
+                    // These must match the options exactly to show up in the dropdown
+                    academicYear: employee.academicYear || '', 
+                    generation: employee.generation || '', 
+                    group: employee.group || '', 
+                    class: employee.class || '', 
+                    skill: employee.skill || '', 
+                    section: employee.section || '', 
+                    position: employee.position || '', 
+                    telegram: employee.telegram || '', 
+                    imageUrl: employee.imageUrl || '', 
+                    
+                    mon: employee.mon || '', 
+                    tue: employee.tue || '', 
+                    wed: employee.wed || '', 
+                    thu: employee.thu || '', 
+                    fri: employee.fri || '', 
+                    sat: employee.sat || '', 
+                    sun: employee.sun || '' 
+                }); 
+                setPreviewUrl(employee.imageUrl || ''); 
+                setImageFile(null); 
+            } else {
+                setPreviewUrl('');
+                setImageFile(null);
+                setFormData({ 
+                    name: '', latinName: '', gender: 'ប្រុស', dob: '', pob: '', 
+                    studentId: '', academicYear: '', generation: '', group: '', 
+                    class: '', skill: '', section: '', position: '', telegram: '', 
+                    imageUrl: '', 
+                    mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' 
+                });
+            }
         }
-    }, [employee]);
+    }, [isOpen, employee]);
     
-    // Handle input changes
     const handleChange = (e) => { 
         const { name, value } = e.target; 
         
@@ -70,78 +99,56 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
         setFormData(prev => ({ ...prev, [name]: value })); 
     };
 
-    // Handle Image Selection
     const handleImageUpload = (e) => {
         const file = e.target.files[0]; if (!file) return;
-        
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit for Cloudinary
+        if (file.size > 5 * 1024 * 1024) { 
              alert("រូបភាពធំពេក! សូមជ្រើសរើសរូបភាពក្រោម 5MB");
              return;
         }
-
-        // 1. Store the File object to upload later
         setImageFile(file);
-
-        // 2. Create a local preview immediately
         const reader = new FileReader(); 
-        reader.onloadend = () => { 
-            setPreviewUrl(reader.result); 
-        }; 
+        reader.onloadend = () => setPreviewUrl(reader.result); 
         reader.readAsDataURL(file);
     };
 
-    // --- HELPER: UPLOAD TO CLOUDINARY ---
     const uploadToCloudinary = async (file) => {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("upload_preset", UPLOAD_PRESET);
-
-        const response = await fetch(
-            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-            { method: "POST", body: formData }
-        );
-
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
         if (!response.ok) throw new Error("Cloudinary upload failed");
         const data = await response.json();
-        return data.secure_url; // Returns the HTTP link
+        return data.secure_url; 
     };
 
-    // --- MAIN SAVE LOGIC ---
     const handleSubmit = async (e) => {
         e.preventDefault(); 
         setLoading(true);
 
         try {
-            // 1. Validate ID
             if (!formData.studentId || formData.studentId.trim() === "") {
                 alert("សូមបញ្ចូលអត្តលេខ (ID) ជាមុនសិន!");
                 setLoading(false);
                 return;
             }
 
-            // 2. Validate Telegram
             if (formData.telegram && !/^(https?:\/\/)?(t\.me\/|telegram\.me\/)?[a-zA-Z0-9_]{5,}$/.test(formData.telegram)) {
                 alert("តេឡេក្រាមត្រូវតែជា Link (ឧ. t.me/username)!"); 
                 setLoading(false); 
                 return;
             }
 
-            // 3. UPLOAD IMAGE IF NEW FILE SELECTED
-            let finalImageUrl = formData.imageUrl; // Default to existing URL
-            
+            let finalImageUrl = formData.imageUrl; 
             if (imageFile) {
                 try {
-                    // Upload to Cloudinary and get the link
                     finalImageUrl = await uploadToCloudinary(imageFile);
                 } catch (uploadError) {
-                    console.error("Image upload failed:", uploadError);
-                    alert("បរាជ័យក្នុងការ Upload រូបភាព។ សូមព្យាយាមម្តងទៀត។");
+                    alert("បរាជ័យក្នុងការ Upload រូបភាព។");
                     setLoading(false);
                     return;
                 }
             }
 
-            // 4. Prepare payload (Save the Link, not the file)
             const dbPayload = {
                 'ឈ្មោះ': formData.name, 
                 'ឈ្មោះឡាតាំង': formData.latinName, 
@@ -157,37 +164,30 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                 'ផ្នែកការងារ': formData.section, 
                 'តួនាទី': formData.position, 
                 'តេឡេក្រាម': formData.telegram, 
-                'រូបថត': finalImageUrl, // <--- Saving the URL here
+                'រូបថត': finalImageUrl,
                 'កាលវិភាគ': { 
                     'ចន្ទ': formData.mon, 'អង្គារ៍': formData.tue, 'ពុធ': formData.wed, 
                     'ព្រហស្បត្តិ៍': formData.thu, 'សុក្រ': formData.fri, 'សៅរ៍': formData.sat, 'អាទិត្យ': formData.sun 
                 }
             };
             
-            if (employee?.id) { 
-                // --- EDIT MODE ---
-                // NOTE: We rely on the existing ID structure. 
+            if (employee && employee.id) { 
                 await db.ref(`students/${employee.id}`).update(dbPayload); 
-                addToast("កែប្រែព័ត៌មានជោគជ័យ"); 
-            } 
-            else { 
-                // --- CREATE MODE ---
+                addToast("កែប្រែព័ត៌មានជោគជ័យ", "success"); 
+            } else { 
                 const snapshot = await db.ref(`students/${formData.studentId}`).once('value');
-                
                 if (snapshot.exists()) {
-                    alert(`អត្តលេខ ${formData.studentId} មានរួចហើយ! សូមប្រើអត្តលេខផ្សេង។`);
+                    alert(`អត្តលេខ ${formData.studentId} មានរួចហើយ!`);
                     setLoading(false);
                     return;
                 }
-
                 await db.ref(`students/${formData.studentId}`).set(dbPayload); 
-                addToast("បញ្ចូលទិន្នន័យថ្មីជោគជ័យ"); 
+                addToast("បញ្ចូលទិន្នន័យថ្មីជោគជ័យ", "success"); 
             }
-            
             onClose();
         } catch (error) { 
             console.error(error); 
-            addToast("បរាជ័យក្នុងការរក្សាទុក: " + error.message, 'error'); 
+            addToast("បរាជ័យ: " + error.message, 'error'); 
         } finally { 
             setLoading(false); 
         }
@@ -195,12 +195,20 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
 
     const isFormValid = useMemo(() => formData.name?.trim().length > 0 && formData.studentId?.trim().length > 0, [formData.name, formData.studentId]);
 
-    const renderSelect = (label, name, options, required = false) => (
+    // Ensure options is always an array to prevent crashes
+    const renderSelect = (label, name, options = [], required = false) => (
         <div>
             <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block tracking-wide">{label} {required && <span className="text-red-500">*</span>}</label>
             <select name={name} value={formData[name]} onChange={handleChange} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 outline-none input-modern">
                 <option value="">ជ្រើសរើស...</option>
-                {options && options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                {/* Dynamic Option Rendering:
+                   If the current value from DB (formData[name]) is NOT in the options list, 
+                   we add it as a hidden option so the user can see it but is encouraged to change it.
+                */}
+                {formData[name] && !options.includes(formData[name]) && (
+                    <option value={formData[name]}>{formData[name]} (Current)</option>
+                )}
+                {options.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
             </select>
         </div>
     );
@@ -208,9 +216,8 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-            <div className="glass-modal rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white animate-scale-in">
-                {/* Header */}
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="relative bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white animate-scale-in">
                 <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-white/50 shrink-0">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800 tracking-tight">{employee ? 'កែប្រែព័ត៌មាន' : 'បញ្ចូលបុគ្គលិកថ្មី'}</h2>
@@ -221,10 +228,8 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                     </button>
                 </div>
 
-                {/* Form Body */}
                 <form onSubmit={handleSubmit} className="p-8 overflow-y-auto grow custom-scrollbar bg-slate-50/30">
                     <div className="flex gap-10 flex-col lg:flex-row mb-8">
-                        {/* Image & ID Section */}
                         <div className="flex flex-col items-center gap-6 lg:w-1/4">
                             <div className="relative group">
                                 <div className="h-48 w-48 rounded-3xl border-4 border-white overflow-hidden bg-white shadow-xl rotate-3 group-hover:rotate-0 transition-all duration-500">
@@ -238,22 +243,12 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                                     <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                                 </label>
                             </div>
-                            
                             <div className="w-full mt-4">
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block text-center">លេខសម្គាល់ (ID) <span className="text-red-500">*</span></label>
-                                <input 
-                                    name="studentId" 
-                                    value={formData.studentId} 
-                                    onChange={handleChange} 
-                                    disabled={!!employee} 
-                                    className={`w-full p-4 border-slate-200 rounded-2xl bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all text-center font-mono font-bold text-xl text-indigo-600 tracking-widest shadow-sm input-modern ${!!employee ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                    placeholder="ID..." 
-                                />
-                                {!!employee && <p className="text-[10px] text-center text-slate-400 mt-1">ID មិនអាចកែបានទេ (Edit)</p>}
+                                <input name="studentId" value={formData.studentId} onChange={handleChange} disabled={!!employee} className={`w-full p-4 border-slate-200 rounded-2xl bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all text-center font-mono font-bold text-xl text-indigo-600 tracking-widest shadow-sm input-modern ${!!employee ? 'opacity-70 cursor-not-allowed' : ''}`} placeholder="ID..." />
                             </div>
                         </div>
 
-                        {/* General Info */}
                         <div className="flex-1 space-y-8">
                             <div className="bg-white/60 p-6 rounded-3xl border border-white shadow-sm">
                                 <div className="flex items-center gap-2 mb-6 pb-2 border-b border-slate-100">
@@ -276,7 +271,6 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                                 </div>
                             </div>
 
-                            {/* Academic & Job Info */}
                             <div className="bg-white/60 p-6 rounded-3xl border border-white shadow-sm">
                                 <div className="flex items-center gap-2 mb-6 pb-2 border-b border-slate-100">
                                     <BriefcaseIcon className="h-5 w-5 text-purple-500" />
@@ -295,7 +289,6 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                         </div>
                     </div>
 
-                    {/* Schedule Section */}
                     <div className="bg-white/60 p-6 rounded-3xl border border-white shadow-sm">
                         <div className="flex items-center gap-2 mb-6 pb-2 border-b border-slate-100">
                             <CalendarIcon className="h-5 w-5 text-orange-500" />
@@ -320,7 +313,6 @@ export default function EmployeeFormModal({ isOpen, onClose, employee, db, addTo
                     </div>
                 </form>
 
-                {/* Footer Buttons */}
                 <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-end gap-4 shrink-0">
                     <button onClick={onClose} className="px-8 py-3 rounded-xl text-slate-600 font-semibold hover:bg-slate-100 transition-colors">បោះបង់</button>
                     <button onClick={handleSubmit} disabled={loading || !isFormValid} className="px-10 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 transition-all">
