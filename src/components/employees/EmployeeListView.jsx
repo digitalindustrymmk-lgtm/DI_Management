@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-    FilterIcon, SearchIcon, PlusIcon, Trash2Icon, CheckSquareIcon, XIcon, LayoutGridIcon, ListIcon, RotateCcwIcon, PrinterIcon 
-} from '../Icons';
+    FilterIcon, SearchIcon, PlusIcon, Trash2Icon, CheckSquareIcon, XIcon, 
+    LayoutGridIcon, ListIcon, RotateCcwIcon, PrinterIcon 
+} from '../Icons'; 
 import SortOptionsModal from '../common/SortOptionsModal';
 import SortableHeader from '../common/SortableHeader';
 import PaginationControls from '../common/PaginationControls';
@@ -27,16 +28,20 @@ const EmployeeListView = ({
 }) => {
     const [viewMode, setViewMode] = useState(window.innerWidth < 768 ? 'grid' : 'list');
     const [searchTerm, setSearchTerm] = useState('');
-    const [showMobileSearch, setShowMobileSearch] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedIds, setSelectedIds] = useState(new Set());
     
+    // --- SHOW/HIDE FILTERS (Desktop) & MOBILE OVERLAY ---
+    const [showFilters, setShowFilters] = useState(false);
+    const [showMobileSearch, setShowMobileSearch] = useState(false);
+
     // --- PRINT MODAL STATE ---
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
     // --- FILTERS & SORTING STATE ---
     const [filterGroup, setFilterGroup] = useState('');
     const [filterClass, setFilterClass] = useState('');
+    const [filterSection, setFilterSection] = useState('');
     const [filterYear, setFilterYear] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
@@ -45,6 +50,9 @@ const EmployeeListView = ({
 
     const itemsPerPage = 50;
     
+    // Check if any advanced filter is active
+    const isFilterActive = filterGroup || filterClass || filterSection || filterYear;
+
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth < 768) {
@@ -80,15 +88,14 @@ const EmployeeListView = ({
         return [...new Set(classes)].sort();
     }, [employees]);
 
-    const uniqueYears = useMemo(() => {
-        const years = employees.map(emp => emp.academicYear).filter(y => y && y.trim() !== '');
-        return [...new Set(years)].sort();
-    }, [employees]);
-
-    // NEW: Unique Sections
     const uniqueSections = useMemo(() => {
         const sections = employees.map(emp => emp.section).filter(s => s && s.trim() !== '');
         return [...new Set(sections)].sort();
+    }, [employees]);
+
+    const uniqueYears = useMemo(() => {
+        const years = employees.map(emp => emp.academicYear).filter(y => y && y.trim() !== '');
+        return [...new Set(years)].sort();
     }, [employees]);
 
     // Filtering Logic
@@ -101,11 +108,12 @@ const EmployeeListView = ({
             
             const matchesGroup = !filterGroup || emp.group === filterGroup;
             const matchesClass = !filterClass || emp.class === filterClass;
+            const matchesSection = !filterSection || emp.section === filterSection;
             const matchesYear = !filterYear || emp.academicYear === filterYear;
 
-            return matchesSearch && matchesGroup && matchesClass && matchesYear;
+            return matchesSearch && matchesGroup && matchesClass && matchesSection && matchesYear;
         });
-    }, [employees, searchTerm, filterGroup, filterClass, filterYear]);
+    }, [employees, searchTerm, filterGroup, filterClass, filterSection, filterYear]);
 
     // --- SORTING LOGIC ---
     const sortedEmployees = useMemo(() => {
@@ -152,7 +160,8 @@ const EmployeeListView = ({
         setSortModalData(null); 
     };
 
-    useEffect(() => setCurrentPage(1), [searchTerm, filterGroup, filterClass, filterYear]);
+    // Reset pagination when any filter changes
+    useEffect(() => setCurrentPage(1), [searchTerm, filterGroup, filterClass, filterSection, filterYear]);
 
     const toggleSelect = (id) => {
         setSelectedIds(prev => {
@@ -186,14 +195,16 @@ const EmployeeListView = ({
             <PrintOptionsModal 
                 isOpen={isPrintModalOpen}
                 onClose={() => setIsPrintModalOpen(false)}
-                employees={employees} // Pass ALL employees so modal can filter
+                employees={employees} 
                 uniqueGroups={uniqueGroups}
                 uniqueClasses={uniqueClasses}
                 uniqueSections={uniqueSections}
             />
 
+            {/* --- MOBILE/TABLET FLOATING BUTTONS (Visible < 1024px / lg) --- */}
+            {/* These are hidden on large screens (lg:hidden) */}
             {!isRecycleBin && !isModalOpen && (
-                <div className="md:hidden fixed bottom-6 right-6 flex flex-col gap-4 z-[90]">
+                <div className="lg:hidden fixed bottom-6 right-6 flex flex-col gap-4 z-[90]">
                       {selectedIds.size > 0 && (
                            <button 
                             onClick={() => { onBulkDelete(Array.from(selectedIds)); setSelectedIds(new Set()); }}
@@ -204,112 +215,217 @@ const EmployeeListView = ({
                         </button>
                     )}
                     
-                    {/* NEW: PDF Download Button for Mobile */}
+                    {/* PDF Download Button */}
                     <button 
                         onClick={() => setIsPrintModalOpen(true)}
-                        className="h-14 w-14 bg-white text-slate-700 rounded-full shadow-2xl flex items-center justify-center border border-slate-100 transition-all duration-300 active:scale-95"
+                        className="h-14 w-14 bg-white text-slate-700 rounded-full shadow-2xl flex items-center justify-center border border-slate-100 transition-all duration-300 active:scale-95 hover:text-indigo-600"
                         style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}
                     >
                         <PrinterIcon className="h-6 w-6" />
                     </button>
 
+                    {/* Select All Button */}
                     <button onClick={toggleSelectAll} className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`} style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}><CheckSquareIcon className="h-6 w-6" /></button>
                     
-                    <button onClick={() => setShowMobileSearch(!showMobileSearch)} className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${showMobileSearch ? 'bg-slate-700 text-white rotate-90' : 'bg-white text-indigo-600 border border-indigo-100'}`} style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}>{showMobileSearch ? <PlusIcon className="h-6 w-6 rotate-45" /> : <SearchIcon className="h-6 w-6" />}</button>
+                    {/* Search & Filter Trigger */}
+                    <button 
+                        onClick={() => setShowMobileSearch(true)} 
+                        className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${showMobileSearch ? 'bg-slate-800 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`} 
+                        style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}
+                    >
+                        <SearchIcon className="h-6 w-6" />
+                    </button>
                     
+                    {/* Create New Report/Employee */}
                     <button onClick={onCreate} className="h-14 w-14 bg-indigo-600 text-white rounded-full flex items-center justify-center active:scale-95 transition-transform" style={{ boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.5)' }}><PlusIcon className="h-7 w-7" /></button>
                 </div>
             )}
 
-            {/* FIXED: Z-Index updated from z-[60] to z-[100] to sit ABOVE the floating buttons */}
-            <div className={`md:hidden fixed inset-0 z-[100] bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMobileSearch ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileSearch(false)}>
+            {/* --- MOBILE SEARCH OVERLAY (Visible < 1024px when toggled) --- */}
+            {/* This handles BOTH Name/ID search AND Filter dropdowns for mobile */}
+            <div className={`lg:hidden fixed inset-0 z-[100] bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMobileSearch ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileSearch(false)}>
                 <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-5 shadow-2xl transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : 'translate-y-full'}`} onClick={e => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-bold text-slate-700 text-lg">Search & Filter</h3>
+                        {(searchTerm || filterGroup || filterClass || filterSection || filterYear) && (
+                            <button 
+                                onClick={() => { setSearchTerm(''); setFilterGroup(''); setFilterClass(''); setFilterSection(''); setFilterYear(''); }} 
+                                className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1"
+                            >
+                                <RotateCcwIcon className="h-3 w-3" /> Reset
+                            </button>
+                        )}
                         <button onClick={() => setShowMobileSearch(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200"><XIcon className="h-5 w-5" /></button>
                     </div>
+                    
                     <div className="flex flex-col gap-4">
+                        {/* Search Input (Moved here from top bar for mobile) */}
                         <div className="relative w-full group">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><SearchIcon className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
-                            <input type="text" className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200" placeholder="Search name, ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                            <input type="text" className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200" placeholder="Search Name or ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
                         
+                        {/* Filters Grid */}
                         <div className="grid grid-cols-2 gap-3">
-                            <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none">
-                                <option value="">All Groups</option>
-                                {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
-                            </select>
-                            <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none">
-                                <option value="">All Classes</option>
-                                {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                            <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none col-span-2">
-                                <option value="">All Academic Years</option>
-                                {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
-                            </select>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 ml-1">Group</label>
+                                <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none">
+                                    <option value="">All</option>
+                                    {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 ml-1">Class</label>
+                                <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none">
+                                    <option value="">All</option>
+                                    {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 ml-1">Section</label>
+                                <select value={filterSection} onChange={(e) => setFilterSection(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none">
+                                    <option value="">All</option>
+                                    {uniqueSections.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 ml-1">Year</label>
+                                <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="w-full py-3 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold outline-none">
+                                    <option value="">All</option>
+                                    {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+                                </select>
+                            </div>
                         </div>
 
-                        <button onClick={() => setShowMobileSearch(false)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold mt-2 shadow-lg shadow-indigo-200">Show Results ({filteredEmployees.length})</button>
+                        <button onClick={() => setShowMobileSearch(false)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold mt-2 shadow-lg shadow-indigo-200">
+                            Show Results ({filteredEmployees.length})
+                        </button>
                     </div>
                 </div>
             </div>
 
             <div className="space-y-6 animate-fade-in relative min-h-[500px]">
-                <div className={`glass-panel p-4 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4 sticky top-0 z-20 transition-all duration-300 ${!showMobileSearch ? 'hidden md:flex' : 'flex'}`}>
+                
+                {/* --- UNIFIED HEADER (Desktop Only >= 1024px) --- */}
+                {/* HIDDEN ON MOBILE/TABLET (max-width 1023px) */}
+                <div className="hidden lg:block glass-panel rounded-3xl sticky top-0 z-40 transition-all duration-300 shadow-sm border border-slate-100">
                     
-                    <div className={`flex flex-1 gap-3 items-center w-full transition-all duration-300 ${showMobileSearch ? 'block' : 'hidden md:flex'}`}>
-                        <div className="relative w-full md:w-64 group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
-                            <input type="text" className="block w-full pl-12 pr-4 py-2.5 border-none rounded-2xl bg-white/50 focus:bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-400 font-medium text-sm" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    {/* TOP ROW: Search, Filter Toggle, Desktop Actions */}
+                    <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                        
+                        {/* SEARCH & FILTER TOGGLE */}
+                        <div className="flex gap-3 items-center w-full md:w-auto flex-1">
+                            
+                            {/* Search Input */}
+                            <div className="relative w-full md:w-72 lg:w-96 group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <SearchIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                </div>
+                                <input 
+                                    type="text" 
+                                    className="block w-full pl-12 pr-4 py-3 border-none rounded-2xl bg-slate-100/50 focus:bg-white ring-1 ring-transparent focus:ring-slate-200 outline-none transition-all placeholder:text-slate-400 font-bold text-sm text-slate-700 shadow-inner" 
+                                    placeholder="Search by Name or ID..." 
+                                    value={searchTerm} 
+                                    onChange={(e) => setSearchTerm(e.target.value)} 
+                                />
+                            </div>
+
+                            {/* Filter Toggle Button */}
+                            <button 
+                                onClick={() => setShowFilters(!showFilters)} 
+                                className={`
+                                    p-3 rounded-2xl transition-all duration-200 flex-shrink-0 border relative
+                                    ${showFilters || isFilterActive 
+                                        ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-200' 
+                                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                                    }
+                                `}
+                                title="Toggle Filters"
+                            >
+                                <FilterIcon className="h-5 w-5" />
+                                {isFilterActive && !showFilters && (
+                                    <span className="absolute top-2 right-2 h-2 w-2 bg-red-400 rounded-full border border-indigo-600"></span>
+                                )}
+                            </button>
                         </div>
 
-                        <div className="hidden xl:flex items-center gap-2">
-                            <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50/50 rounded-xl border border-indigo-100 whitespace-nowrap">
-                                <FilterIcon className="h-4 w-4 text-indigo-500" />
-                                <span className="text-xs font-bold text-indigo-600">Filter:</span>
-                            </div>
-                            <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="py-2 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-200 min-w-[100px] hover:border-indigo-300 transition-colors cursor-pointer"><option value="">Group</option>{uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}</select>
-                            <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="py-2 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-200 min-w-[100px] hover:border-indigo-300 transition-colors cursor-pointer"><option value="">Class</option>{uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                            <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="py-2 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px] hover:border-indigo-300 transition-colors cursor-pointer"><option value="">Year</option>{uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}</select>
-                            {(filterGroup || filterClass || filterYear) && (
-                                <button onClick={() => { setFilterGroup(''); setFilterClass(''); setFilterYear(''); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Reset Filters"><RotateCcwIcon className="h-4 w-4" /></button>
+                        {/* DESKTOP RIGHT ACTIONS */}
+                        <div className="flex items-center gap-3">
+                            {!isRecycleBin && (
+                                <>
+                                    {selectedIds.size > 0 ? (
+                                        <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-2xl animate-fade-in">
+                                            <span className="text-sm font-bold text-indigo-700">{selectedIds.size} Selected</span>
+                                            <button 
+                                                onClick={() => { onBulkDelete(Array.from(selectedIds)); setSelectedIds(new Set()); }}
+                                                className="flex items-center gap-2 bg-white text-red-600 px-3 py-1.5 rounded-xl text-sm font-bold border border-red-100 hover:bg-red-50 transition-colors"
+                                            >
+                                                <Trash2Icon className="h-4 w-4" /> Delete
+                                            </button>
+                                            <button onClick={() => setSelectedIds(new Set())} className="text-slate-400 hover:text-slate-600"><XIcon className="h-4 w-4" /></button>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-white/50 p-1.5 rounded-xl flex items-center ring-1 ring-slate-200">
+                                            <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
+                                            <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
+                                            <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                                            <button onClick={() => setIsPrintModalOpen(true)} className="p-2.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-all" title="Export PDF">
+                                                <PrinterIcon className="h-5 w-5" />
+                                            </button>
+                                        </div>
+                                    )}
+                                    <button onClick={onCreate} className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /> New</button>
+                                </>
                             )}
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between w-full md:w-auto gap-3">
-                        {!isRecycleBin && (
-                            <>
-                            {selectedIds.size > 0 ? (
-                                <div className="hidden md:flex items-center gap-3 bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-2xl animate-fade-in">
-                                    <span className="text-sm font-bold text-indigo-700">{selectedIds.size} Selected</span>
+                    {/* EXPANDABLE FILTER AREA (Desktop) */}
+                    <div className={`overflow-hidden transition-all duration-300 ease-in-out border-t border-slate-100 bg-slate-50/50 ${showFilters ? 'max-h-[500px] opacity-100 py-4' : 'max-h-0 opacity-0 py-0'}`}>
+                        <div className="px-4">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Filter By Options</h3>
+                                {(filterGroup || filterClass || filterSection || filterYear) && (
                                     <button 
-                                        onClick={() => { onBulkDelete(Array.from(selectedIds)); setSelectedIds(new Set()); }}
-                                        className="flex items-center gap-2 bg-white text-red-600 px-3 py-1.5 rounded-xl text-sm font-bold border border-red-100 hover:bg-red-50 transition-colors"
+                                        onClick={() => { setFilterGroup(''); setFilterClass(''); setFilterSection(''); setFilterYear(''); }} 
+                                        className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1"
                                     >
-                                        <Trash2Icon className="h-4 w-4" /> Delete
+                                        <RotateCcwIcon className="h-3 w-3" /> Reset
                                     </button>
-                                    <button onClick={() => setSelectedIds(new Set())} className="text-slate-400 hover:text-slate-600"><XIcon className="h-4 w-4" /></button>
+                                )}
+                            </div>
+                            
+                            <div className="grid grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1">GROUP</label>
+                                    <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:border-indigo-300">
+                                        <option value="">All Groups</option>
+                                        {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                                    </select>
                                 </div>
-                            ) : (
-                                <div className="hidden md:flex bg-white/50 p-1.5 rounded-xl items-center ring-1 ring-slate-200">
-                                    <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
-                                    <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
-                                    
-                                    {/* PRINT BUTTON */}
-                                    <button onClick={() => setIsPrintModalOpen(true)} className="p-2.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-all ml-1" title="Export PDF">
-                                        <PrinterIcon className="h-5 w-5" />
-                                    </button>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1">CLASS</label>
+                                    <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:border-indigo-300">
+                                        <option value="">All Classes</option>
+                                        {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
                                 </div>
-                            )}
-                            {viewMode === 'grid' && (
-                                <button onClick={toggleSelectAll} className="hidden md:flex items-center justify-center p-3 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:bg-slate-50 transition-all" title="Select All">
-                                    <CheckSquareIcon className={`h-5 w-5 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'text-indigo-600' : ''}`} />
-                                </button>
-                            )}
-                            <button onClick={onCreate} className="hidden md:flex flex-1 md:flex-none items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:-translate-y-1 transition-all"><PlusIcon className="h-5 w-5" /><span className="hidden sm:inline">បង្កើតថ្មី</span><span className="sm:hidden">New</span></button>
-                            </>
-                        )}
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1">SECTION</label>
+                                    <select value={filterSection} onChange={(e) => setFilterSection(e.target.value)} className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:border-indigo-300">
+                                        <option value="">All Sections</option>
+                                        {uniqueSections.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 ml-1">YEAR</label>
+                                    <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:border-indigo-300">
+                                        <option value="">All Years</option>
+                                        {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
