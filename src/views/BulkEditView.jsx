@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
-// --- INLINED CONSTANTS & ICONS ---
+// --- UPDATED CONSTANTS (KHMER) ---
+const ACADEMIC_YEARS = ["ឆ្នាំទី១", "ឆ្នាំទី២", "ឆ្នាំទី៣", "ឆ្នាំទី៤"];
 
-const ACADEMIC_YEARS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027"];
-
+// --- ICONS ---
 const SearchIcon = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <circle cx="11" cy="11" r="8" />
@@ -80,16 +80,15 @@ const MapPinIcon = (props) => (
   </svg>
 );
 
-// --- SEARCH CONTROLS (Moved Outside & Updated with Section Filter) ---
+// --- SEARCH CONTROLS ---
 const SearchControls = ({ 
   searchTerm, setSearchTerm, 
   filterClass, setFilterClass, 
   filterYear, setFilterYear, 
   filterGroup, setFilterGroup, 
-  filterSection, setFilterSection, // NEW: Section Filter Props
+  filterSection, setFilterSection, 
   uniqueClasses, uniqueYears, 
-  uniqueGroups, 
-  uniqueSections // NEW: Unique Sections List
+  uniqueGroups, uniqueSections 
 }) => (
   <>
     <div className="relative w-full md:w-64 group">
@@ -111,25 +110,21 @@ const SearchControls = ({
         <span className="text-xs font-bold text-indigo-600">Filter:</span>
       </div>
       
-      {/* Group Filter */}
       <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
         <option value="">គ្រប់ក្រុម</option>
         {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
       </select>
 
-      {/* Class Filter */}
       <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
         <option value="">គ្រប់ថ្នាក់</option>
         {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
 
-      {/* NEW: Section Filter */}
       <select value={filterSection} onChange={(e) => setFilterSection(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
         <option value="">គ្រប់ផ្នែក</option>
         {uniqueSections.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
 
-      {/* Year Filter */}
       <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200 min-w-[120px]">
         <option value="">គ្រប់ឆ្នាំសិក្សា</option>
         {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
@@ -147,15 +142,52 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
     const [filterClass, setFilterClass] = useState('');
     const [filterYear, setFilterYear] = useState('');
     const [filterGroup, setFilterGroup] = useState('');
-    const [filterSection, setFilterSection] = useState(''); // NEW: Section Filter State
+    const [filterSection, setFilterSection] = useState(''); 
     const [searchTerm, setSearchTerm] = useState('');
-    const [showMobileSearch, setShowMobileSearch] = useState(false);
     
     // Edit & Modal State
     const [isApplying, setIsApplying] = useState(false);
     const [viewEmployee, setViewEmployee] = useState(null);
     const [activeTab, setActiveTab] = useState('personal'); 
     const [updateData, setUpdateData] = useState({ group: '', section: '', position: '', academicYear: '', mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' });
+
+    // --- FIX: ROBUST PRE-FILL LOGIC ---
+    useEffect(() => {
+        // 1. Reset if nothing selected
+        if (selectedIds.size === 0) {
+            setUpdateData({ group: '', section: '', position: '', academicYear: '', mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' });
+            return;
+        }
+
+        // 2. Get Selected Employee Objects
+        const selectedEmps = employees.filter(e => selectedIds.has(e.id));
+        if (selectedEmps.length === 0) return;
+
+        // 3. Helper to normalize values for comparison (handles null/undefined/numbers vs strings)
+        const normalize = (val) => (val === null || val === undefined) ? '' : String(val).trim();
+
+        const fieldsToCheck = ['group', 'section', 'position', 'academicYear', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const newFormState = {};
+
+        fieldsToCheck.forEach(field => {
+            const firstValue = normalize(selectedEmps[0][field]);
+
+            const isUniform = selectedEmps.every(emp => {
+                return normalize(emp[field]) === firstValue;
+            });
+
+            if (isUniform) {
+                // Use the raw value from the first employee if they match (to preserve exact spacing if valid), 
+                // otherwise fallback to empty string.
+                newFormState[field] = (firstValue !== '') ? selectedEmps[0][field] : '';
+            } else {
+                newFormState[field] = ''; // Different values = blank
+            }
+        });
+
+        setUpdateData(newFormState);
+
+    }, [selectedIds, employees]);
 
     const uniqueClasses = useMemo(() => {
         const classes = employees.map(emp => emp.class).filter(c => c && c.trim() !== '');
@@ -172,7 +204,6 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
         return [...new Set(groups)].sort();
     }, [employees]);
 
-    // NEW: Unique Sections Calculation
     const uniqueSections = useMemo(() => {
         const sections = employees.map(emp => emp.section).filter(s => s && s.trim() !== '');
         return [...new Set(sections)].sort();
@@ -183,7 +214,7 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
             const matchClass = filterClass ? emp.class === filterClass : true;
             const matchYear = filterYear ? emp.academicYear === filterYear : true;
             const matchGroup = filterGroup ? emp.group === filterGroup : true;
-            const matchSection = filterSection ? emp.section === filterSection : true; // NEW: Section Filter Logic
+            const matchSection = filterSection ? emp.section === filterSection : true; 
             const isNumericId = /^\d+$/.test(emp.studentId || '');
 
             const cleanSearchTerm = searchTerm.toLowerCase().replace(/\s+/g, '');
@@ -224,17 +255,21 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
         const updates = {};
         const fieldsToUpdate = {};
         
-        if(updateData.group) fieldsToUpdate['ក្រុម'] = updateData.group;
-        if(updateData.section) fieldsToUpdate['ផ្នែកការងារ'] = updateData.section;
-        if(updateData.position) fieldsToUpdate['តួនាទី'] = updateData.position;
-        if(updateData.academicYear) fieldsToUpdate['ឆ្នាំសិក្សា'] = updateData.academicYear;
+        if(updateData.group !== '') fieldsToUpdate['ក្រុម'] = updateData.group;
+        if(updateData.section !== '') fieldsToUpdate['ផ្នែកការងារ'] = updateData.section;
+        if(updateData.position !== '') fieldsToUpdate['តួនាទី'] = updateData.position;
+        if(updateData.academicYear !== '') fieldsToUpdate['ឆ្នាំសិក្សា'] = updateData.academicYear;
         
         const scheduleFields = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
         const khmerDays = ['ចន្ទ', 'អង្គារ៍', 'ពុធ', 'ព្រហស្បត្តិ៍', 'សុក្រ', 'សៅរ៍', 'អាទិត្យ'];
         
         selectedIds.forEach(id => {
             Object.keys(fieldsToUpdate).forEach(key => { updates[`students/${id}/${key}`] = fieldsToUpdate[key]; });
-            scheduleFields.forEach((day, idx) => { if(updateData[day]) { updates[`students/${id}/កាលវិភាគ/${khmerDays[idx]}`] = updateData[day]; } });
+            scheduleFields.forEach((day, idx) => { 
+                if(updateData[day] !== '') { 
+                    updates[`students/${id}/កាលវិភាគ/${khmerDays[idx]}`] = updateData[day]; 
+                } 
+            });
         });
 
         try {
@@ -275,198 +310,177 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
         });
     };
 
-    const renderSelect = (label, name, options, placeholder = "មិនកែប្រែ") => (
-        <div className="min-w-[140px]">
-            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">{label}</label>
-            <div className="relative">
-                <select value={updateData[name]} onChange={(e) => handleUpdateChange(name, e.target.value)} className={`w-full py-2 pl-2 pr-6 border rounded-xl outline-none text-xs font-bold appearance-none transition-all ${updateData[name] ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-400'}`}>
-                    <option value="">{placeholder}</option>
-                    {options && options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-                <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none opacity-50"><ChevronDownIcon className="h-3 w-3" /></div>
+    // --- HELPER: RENDER SELECT ---
+    const renderSelect = (label, name, options, placeholder = "មិនកែប្រែ (Various)") => {
+        const currentValue = updateData[name];
+        const safeOptions = Array.isArray(options) ? options : [];
+        const isCustomValue = currentValue && currentValue !== '' && !safeOptions.includes(currentValue);
+
+        return (
+            <div className="min-w-[140px]">
+                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">{label}</label>
+                <div className="relative">
+                    <select value={currentValue} onChange={(e) => handleUpdateChange(name, e.target.value)} className={`w-full py-2 pl-2 pr-6 border rounded-xl outline-none text-xs font-bold appearance-none transition-all ${currentValue ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-400'}`}>
+                        <option value="">{placeholder}</option>
+                        {isCustomValue && <option value={currentValue}>{currentValue}</option>}
+                        {safeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                    <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none opacity-50"><ChevronDownIcon className="h-3 w-3" /></div>
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
+
+    // --- HELPER: RENDER SCHEDULE SELECT ---
+    const renderScheduleSelect = (day) => {
+        const currentValue = updateData[day];
+        const safeOptions = Array.isArray(settings?.schedules) ? settings.schedules : [];
+        const isCustomValue = currentValue && currentValue !== '' && !safeOptions.includes(currentValue);
+
+        return (
+            <select value={currentValue} onChange={(e) => handleUpdateChange(day, e.target.value)} className={`w-full py-1.5 px-1 border rounded-lg text-xs font-bold outline-none text-center ${currentValue ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white border-slate-200'}`}>
+                <option value="">-</option>
+                {/* FORCE SHOW VALUE IF IT EXISTS BUT IS NOT IN LIST */}
+                {isCustomValue && <option value={currentValue}>{currentValue}</option>}
+                {safeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+        );
+    }
 
     return (
-        <>
-            {/* 1. MAIN CONTENT */}
-            <div className="h-full flex flex-col relative animate-fade-in">
-                {/* DESKTOP HEADER (Hidden on Mobile) */}
-                <div className="hidden md:flex glass-panel p-4 rounded-3xl flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4 shrink-0">
-                    <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
-                        <SearchControls 
-                            searchTerm={searchTerm}
-                            setSearchTerm={setSearchTerm}
-                            filterClass={filterClass}
-                            setFilterClass={setFilterClass}
-                            filterYear={filterYear}
-                            setFilterYear={setFilterYear}
-                            filterGroup={filterGroup}
-                            setFilterGroup={setFilterGroup}
-                            filterSection={filterSection} // PASS SECTION FILTER
-                            setFilterSection={setFilterSection} // PASS SECTION SETTER
-                            uniqueClasses={uniqueClasses}
-                            uniqueYears={uniqueYears}
-                            uniqueGroups={uniqueGroups}
-                            uniqueSections={uniqueSections} // PASS UNIQUE SECTIONS
-                        />
-                    </div>
-                    <div className="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200">Total Found: <span className="text-indigo-600 text-sm">{filteredEmployees.length}</span></div>
+        <div className="h-full flex flex-col relative animate-fade-in">
+            {/* DESKTOP HEADER */}
+            <div className="hidden md:flex glass-panel p-4 rounded-3xl flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4 shrink-0">
+                <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
+                    <SearchControls 
+                        searchTerm={searchTerm}
+                        setSearchTerm={setSearchTerm}
+                        filterClass={filterClass}
+                        setFilterClass={setFilterClass}
+                        filterYear={filterYear}
+                        setFilterYear={setFilterYear}
+                        filterGroup={filterGroup}
+                        setFilterGroup={setFilterGroup}
+                        filterSection={filterSection} 
+                        setFilterSection={setFilterSection} 
+                        uniqueClasses={uniqueClasses}
+                        uniqueYears={uniqueYears}
+                        uniqueGroups={uniqueGroups}
+                        uniqueSections={uniqueSections} 
+                    />
                 </div>
+                <div className="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200">Total Found: <span className="text-indigo-600 text-sm">{filteredEmployees.length}</span></div>
+            </div>
 
-                {/* MOBILE HEADER - Just the count */}
-                <div className="md:hidden flex justify-between items-center mb-4 px-2">
-                    <h2 className="text-lg font-bold text-slate-700">បុគ្គលិក ({filteredEmployees.length})</h2>
-                    <div className="text-xs text-slate-500 italic">Double tap for full detail</div>
-                </div>
+            {/* MOBILE HEADER */}
+            <div className="md:hidden flex justify-between items-center mb-4 px-2">
+                <h2 className="text-lg font-bold text-slate-700">បុគ្គលិក ({filteredEmployees.length})</h2>
+                <div className="text-xs text-slate-500 italic">Double tap for full detail</div>
+            </div>
 
-                {/* CONTENT AREA */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar pb-32 px-1 md:px-0">
-                    
-                    {/* TABLE VIEW (DESKTOP) */}
-                    <div className="hidden md:block glass-panel rounded-3xl overflow-hidden bg-white/80">
-                        <table className="min-w-full divide-y divide-slate-100">
-                            <thead className="bg-slate-50/90 backdrop-blur sticky top-0 z-10">
-                                <tr>
-                                    <th className="px-4 py-3 text-left w-12"><input type="checkbox" onChange={handleSelectAll} checked={filteredEmployees.length > 0 && selectedIds.size === filteredEmployees.length} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" /></th>
-                                    <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-500 uppercase">Profile</th>
-                                    <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-500 uppercase">ID / Name</th>
-                                    <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-500 uppercase">Current Info</th>
+            {/* CONTENT AREA */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar pb-32 px-1 md:px-0">
+                
+                {/* TABLE VIEW (DESKTOP) */}
+                <div className="hidden md:block glass-panel rounded-3xl overflow-hidden bg-white/80">
+                    <table className="min-w-full divide-y divide-slate-100">
+                        <thead className="bg-slate-50/90 backdrop-blur sticky top-0 z-10">
+                            <tr>
+                                <th className="px-4 py-3 text-left w-12"><input type="checkbox" onChange={handleSelectAll} checked={filteredEmployees.length > 0 && selectedIds.size === filteredEmployees.length} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" /></th>
+                                <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-500 uppercase">Profile</th>
+                                <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-500 uppercase">ID / Name</th>
+                                <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-500 uppercase">Current Info</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {filteredEmployees.map((emp) => (
+                                <tr key={emp.id} className={`hover:bg-indigo-50/30 transition-colors ${selectedIds.has(emp.id) ? 'bg-indigo-50/60' : ''}`} onClick={() => handleSelectOne(emp.id)}>
+                                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(emp.id)} onChange={() => handleSelectOne(emp.id)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" /></td>
+                                    <td className="px-4 py-3"><div className="h-10 w-10 rounded-full overflow-hidden border border-slate-200">{emp.imageUrl ? <img src={emp.imageUrl} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-slate-100 flex items-center justify-center text-slate-400"><UserIcon className="h-5 w-5" /></div>}</div></td>
+                                    <td className="px-4 py-3"><div className="flex flex-col"><span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit mb-1">{emp.studentId}</span><span className="text-sm font-bold text-slate-700">{emp.name}</span><span className="text-xs text-slate-400">{emp.latinName}</span></div></td>
+                                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2 text-xs"><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.class || 'No Class'}</span><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.academicYear || 'No Year'}</span><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.group || 'No Group'}</span><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.section || 'No Section'}</span></div></td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredEmployees.map((emp) => (
-                                    <tr key={emp.id} className={`hover:bg-indigo-50/30 transition-colors ${selectedIds.has(emp.id) ? 'bg-indigo-50/60' : ''}`} onClick={() => handleSelectOne(emp.id)}>
-                                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(emp.id)} onChange={() => handleSelectOne(emp.id)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" /></td>
-                                        <td className="px-4 py-3"><div className="h-10 w-10 rounded-full overflow-hidden border border-slate-200">{emp.imageUrl ? <img src={emp.imageUrl} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-slate-100 flex items-center justify-center text-slate-400"><UserIcon className="h-5 w-5" /></div>}</div></td>
-                                        <td className="px-4 py-3"><div className="flex flex-col"><span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit mb-1">{emp.studentId}</span><span className="text-sm font-bold text-slate-700">{emp.name}</span><span className="text-xs text-slate-400">{emp.latinName}</span></div></td>
-                                        <td className="px-4 py-3"><div className="flex flex-wrap gap-2 text-xs"><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.class || 'No Class'}</span><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.academicYear || 'No Year'}</span><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.group || 'No Group'}</span><span className="bg-white border border-slate-200 px-2 py-1 rounded text-slate-600">{emp.section || 'No Section'}</span></div></td>
-                                    </tr>
-                                ))}
-                                {filteredEmployees.length === 0 && <tr><td colSpan="4" className="text-center py-10 text-slate-400 italic">No employees found</td></tr>}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* CARD VIEW (MOBILE) */}
-                    <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="flex items-center gap-2 mb-2 px-1">
-                            <input type="checkbox" id="selectAllMobile" onChange={handleSelectAll} checked={filteredEmployees.length > 0 && selectedIds.size === filteredEmployees.length} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" />
-                            <label htmlFor="selectAllMobile" className="text-sm font-bold text-slate-600">Select All</label>
-                        </div>
-                        {filteredEmployees.map((emp) => (
-                            <div 
-                                key={emp.id} 
-                                onDoubleClick={() => { setViewEmployee(emp); setActiveTab('personal'); }}
-                                onClick={() => handleSelectOne(emp.id)}
-                                className={`glass-panel p-4 rounded-2xl border transition-all active:scale-[0.98] relative overflow-hidden ${selectedIds.has(emp.id) ? 'border-indigo-500 bg-indigo-50/50 ring-1 ring-indigo-500' : 'border-transparent bg-white'}`}
-                            >
-                                 {/* Selection Indicator */}
-                                 <div className="absolute top-3 right-3">
-                                    <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-colors ${selectedIds.has(emp.id) ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 bg-white'}`}>
-                                        {selectedIds.has(emp.id) && <CheckCircleIcon className="h-3.5 w-3.5 text-white" />}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <div className="h-12 w-12 rounded-full overflow-hidden border border-slate-200 shrink-0">
-                                        {emp.imageUrl ? <img src={emp.imageUrl} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-slate-100 flex items-center justify-center text-slate-400"><UserIcon className="h-6 w-6" /></div>}
-                                    </div>
-                                    <div className="flex flex-col min-w-0">
-                                        <span className="font-mono text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit mb-0.5">{emp.studentId}</span>
-                                        <span className="text-sm font-bold text-slate-700 truncate">{emp.name}</span>
-                                        <span className="text-xs text-slate-400 truncate">{emp.latinName}</span>
-                                    </div>
-                                </div>
-                                <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
-                                    <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-600 font-medium">{emp.class || 'No Class'}</span>
-                                    <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-600 font-medium">{emp.academicYear || 'No Year'}</span>
-                                    <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-600 font-medium">{emp.group || 'No Group'}</span>
-                                </div>
-                            </div>
-                        ))}
-                         {filteredEmployees.length === 0 && <div className="text-center py-10 text-slate-400 italic col-span-full">No employees found</div>}
-                    </div>
+                            ))}
+                            {filteredEmployees.length === 0 && <tr><td colSpan="4" className="text-center py-10 text-slate-400 italic">No employees found</td></tr>}
+                        </tbody>
+                    </table>
                 </div>
 
-                {/* BULK EDIT PANEL (Inside container to position absolutely at bottom) */}
-                <div className={`absolute bottom-0 left-0 right-0 glass-modal rounded-t-3xl border-t border-indigo-100 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-transform duration-300 transform z-20 ${selectedIds.size > 0 ? 'translate-y-0' : 'translate-y-full'}`}>
-                    <div className="p-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center text-xs font-bold tracking-wider rounded-t-3xl">កែប្រែទិន្នន័យសម្រាប់ {selectedIds.size} នាក់</div>
-                    <div className="p-4 md:p-6 overflow-x-auto custom-scrollbar">
-                        <div className="flex gap-6 min-w-max">
-                            <div className="flex gap-3 pr-6 border-r border-slate-200">
-                                <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs whitespace-nowrap"><BriefcaseIcon className="h-4 w-4" /> ការងារ:</div>
-                                {renderSelect('ក្រុម', 'group', settings?.groups)}
-                                {renderSelect('ផ្នែក', 'section', settings?.sections)}
-                                {renderSelect('តួនាទី', 'position', settings?.positions)}
-                                {renderSelect('ឆ្នាំសិក្សា', 'academicYear', ACADEMIC_YEARS)} 
+                {/* CARD VIEW (MOBILE) */}
+                <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 mb-2 px-1">
+                        <input type="checkbox" id="selectAllMobile" onChange={handleSelectAll} checked={filteredEmployees.length > 0 && selectedIds.size === filteredEmployees.length} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" />
+                        <label htmlFor="selectAllMobile" className="text-sm font-bold text-slate-600">Select All</label>
+                    </div>
+                    {filteredEmployees.map((emp) => (
+                        <div 
+                            key={emp.id} 
+                            onDoubleClick={() => { setViewEmployee(emp); setActiveTab('personal'); }}
+                            onClick={() => handleSelectOne(emp.id)}
+                            className={`glass-panel p-4 rounded-2xl border transition-all active:scale-[0.98] relative overflow-hidden ${selectedIds.has(emp.id) ? 'border-indigo-500 bg-indigo-50/50 ring-1 ring-indigo-500' : 'border-transparent bg-white'}`}
+                        >
+                             {/* Selection Indicator */}
+                             <div className="absolute top-3 right-3">
+                                <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-colors ${selectedIds.has(emp.id) ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 bg-white'}`}>
+                                    {selectedIds.has(emp.id) && <CheckCircleIcon className="h-3.5 w-3.5 text-white" />}
+                                </div>
                             </div>
-                            <div className="flex gap-3">
-                                <div className="flex items-center gap-2 text-orange-500 font-bold text-xs whitespace-nowrap"><CalendarIcon className="h-4 w-4" /> កាលវិភាគ:</div>
-                                {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day, i) => (
-                                    <div key={day} className="min-w-[80px]">
-                                        <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block text-center">{['ចន្ទ','អង្គារ៍','ពុធ','ព្រហ','សុក្រ','សៅរ៍','អាទិត្យ'][i]}</label>
-                                        <select value={updateData[day]} onChange={(e) => handleUpdateChange(day, e.target.value)} className={`w-full py-1.5 px-1 border rounded-lg text-xs font-bold outline-none text-center ${updateData[day] ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white border-slate-200'}`}>
-                                            <option value="">-</option>
-                                            {settings?.schedules?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                        </select>
-                                    </div>
-                                ))}
+
+                            <div className="flex items-center gap-3">
+                                <div className="h-12 w-12 rounded-full overflow-hidden border border-slate-200 shrink-0">
+                                    {emp.imageUrl ? <img src={emp.imageUrl} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-slate-100 flex items-center justify-center text-slate-400"><UserIcon className="h-6 w-6" /></div>}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-mono text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit mb-0.5">{emp.studentId}</span>
+                                    <span className="text-sm font-bold text-slate-700 truncate">{emp.name}</span>
+                                    <span className="text-xs text-slate-400 truncate">{emp.latinName}</span>
+                                </div>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
+                                <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-600 font-medium">{emp.class || 'No Class'}</span>
+                                <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-600 font-medium">{emp.academicYear || 'No Year'}</span>
+                                <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-600 font-medium">{emp.group || 'No Group'}</span>
                             </div>
                         </div>
-                    </div>
-                    <div className="p-4 border-t border-slate-100 bg-white/50 flex justify-end">
-                        <button onClick={handleApplyClick} disabled={isApplying} className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 disabled:opacity-50 transition-all active:scale-95">{isApplying ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <CheckCircleIcon className="h-4 w-4" />} រក្សាទុកការកែប្រែ</button>
-                    </div>
+                    ))}
+                     {filteredEmployees.length === 0 && <div className="text-center py-10 text-slate-400 italic col-span-full">No employees found</div>}
                 </div>
             </div>
 
-            {/* 2. FIXED OVERLAYS (OUTSIDE Main Container to allow true Fixed positioning) */}
-
-            {/* MOBILE FLOATING SEARCH BUTTON */}
-            <button 
-                onClick={() => setShowMobileSearch(true)}
-                className={`md:hidden fixed z-[50] bottom-6 right-4 h-12 w-12 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-300 flex items-center justify-center transition-transform active:scale-90 hover:scale-105 ${selectedIds.size > 0 ? 'translate-y-[-200px]' : ''}`} 
-            >
-                <SearchIcon className="h-6 w-6" />
-            </button>
-
-            {/* MOBILE SEARCH OVERLAY (Fixed Full Screen Overlay) */}
-            <div className={`md:hidden fixed inset-0 z-[60] bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMobileSearch ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileSearch(false)}>
-                <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-5 shadow-2xl transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : 'translate-y-full'}`} onClick={e => e.stopPropagation()}>
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-slate-700 text-lg">ស្វែងរក & Filter</h3>
-                        <button onClick={() => setShowMobileSearch(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200"><XIcon className="h-5 w-5" /></button>
+            {/* BULK EDIT PANEL */}
+            <div className={`absolute bottom-0 left-0 right-0 glass-modal rounded-t-3xl border-t border-indigo-100 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-transform duration-300 transform z-20 ${selectedIds.size > 0 ? 'translate-y-0' : 'translate-y-full'}`}>
+                <div className="p-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center text-xs font-bold tracking-wider rounded-t-3xl">កែប្រែទិន្នន័យសម្រាប់ {selectedIds.size} នាក់</div>
+                <div className="p-4 md:p-6 overflow-x-auto custom-scrollbar">
+                    <div className="flex gap-6 min-w-max">
+                        <div className="flex gap-3 pr-6 border-r border-slate-200">
+                            <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs whitespace-nowrap"><BriefcaseIcon className="h-4 w-4" /> ការងារ:</div>
+                            {renderSelect('ក្រុម', 'group', settings?.groups)}
+                            {renderSelect('ផ្នែក', 'section', settings?.sections)}
+                            {renderSelect('តួនាទី', 'position', settings?.positions)}
+                            {renderSelect('ឆ្នាំសិក្សា', 'academicYear', ACADEMIC_YEARS)} 
+                        </div>
+                        <div className="flex gap-3">
+                            <div className="flex items-center gap-2 text-orange-500 font-bold text-xs whitespace-nowrap"><CalendarIcon className="h-4 w-4" /> កាលវិភាគ:</div>
+                            {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day, i) => (
+                                <div key={day} className="min-w-[80px]">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block text-center">{['ចន្ទ','អង្គារ៍','ពុធ','ព្រហ','សុក្រ','សៅរ៍','អាទិត្យ'][i]}</label>
+                                    {/* USE NEW RENDER HELPER FOR SCHEDULE */}
+                                    {renderScheduleSelect(day)}
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <div className="flex flex-col gap-4">
-                        <SearchControls 
-                            searchTerm={searchTerm}
-                            setSearchTerm={setSearchTerm}
-                            filterClass={filterClass}
-                            setFilterClass={setFilterClass}
-                            filterYear={filterYear}
-                            setFilterYear={setFilterYear}
-                            filterGroup={filterGroup}
-                            setFilterGroup={setFilterGroup}
-                            filterSection={filterSection} // PASS SECTION
-                            setFilterSection={setFilterSection} // PASS SECTION SETTER
-                            uniqueClasses={uniqueClasses}
-                            uniqueYears={uniqueYears}
-                            uniqueGroups={uniqueGroups}
-                            uniqueSections={uniqueSections} // PASS SECTIONS
-                        />
-                        <button onClick={() => setShowMobileSearch(false)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold mt-2 shadow-lg shadow-indigo-200">បង្ហាញលទ្ធផល ({filteredEmployees.length})</button>
-                    </div>
+                </div>
+                <div className="p-4 border-t border-slate-100 bg-white/50 flex justify-end">
+                    <button onClick={handleApplyClick} disabled={isApplying} className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 disabled:opacity-50 transition-all active:scale-95">{isApplying ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <CheckCircleIcon className="h-4 w-4" />} រក្សាទុកការកែប្រែ</button>
                 </div>
             </div>
 
-            {/* EMPLOYEE FULL DETAIL MODAL (Fixed Full Screen Overlay) */}
+            {/* EMPLOYEE FULL DETAIL MODAL */}
             {viewEmployee && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
                     <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative transform transition-all scale-100" onClick={e => e.stopPropagation()}>
                         
-                        {/* Header with Gradient & Close */}
                         <div className="relative h-32 bg-gradient-to-br from-indigo-600 to-purple-700 shrink-0">
                             <button onClick={() => setViewEmployee(null)} className="absolute top-4 right-4 z-10 p-2 bg-black/20 hover:bg-black/30 backdrop-blur-md rounded-full text-white transition-all"><XIcon className="h-5 w-5" /></button>
                             <div className="absolute -bottom-10 left-6">
@@ -476,7 +490,6 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                             </div>
                         </div>
 
-                        {/* Identity Section */}
                         <div className="pt-12 px-6 pb-4 shrink-0">
                             <div className="flex justify-between items-start">
                                 <div>
@@ -490,7 +503,6 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                             </div>
                         </div>
 
-                        {/* Tabs Navigation */}
                         <div className="flex px-6 border-b border-slate-100 shrink-0 gap-6 overflow-x-auto no-scrollbar">
                             <button onClick={() => setActiveTab('personal')} className={`pb-3 text-sm font-bold transition-all relative whitespace-nowrap ${activeTab === 'personal' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
                                 Personal
@@ -506,9 +518,7 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                             </button>
                         </div>
 
-                        {/* Tab Content (Scrollable) */}
                         <div className="overflow-y-auto custom-scrollbar p-6 flex-1 bg-slate-50/50">
-                            
                             {activeTab === 'personal' && (
                                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-4">
@@ -594,11 +604,10 @@ export default function BulkEditView({ db, employees, settings, addToast, setCon
                                     })}
                                 </div>
                             )}
-
                         </div>
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
 }
