@@ -33,7 +33,6 @@ export default function PrintOptionsModal({
     isOpen,
     onClose,
     employees = []
-    // Note: We calculate unique lists inside to handle deduplication logic better
 }) {
     // -- State --
     const [reportTitle] = useState('Digital Industry');
@@ -80,7 +79,7 @@ export default function PrintOptionsModal({
         setCustomColumns(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
     };
 
-    // -- Helper: Get Unique & Cleaned Options (Merges "it support" and "IT Support") --
+    // -- Helper: Get Unique & Cleaned Options --
     const getUniqueOptions = (field) => {
         const map = new Map();
         employees.forEach(emp => {
@@ -90,24 +89,19 @@ export default function PrintOptionsModal({
             const val = String(rawVal).trim();
             const key = val.toLowerCase();
             
-            // If key doesn't exist, set it.
             if (!map.has(key)) {
                 map.set(key, val);
             } else {
-                // If it exists, check if we have a "Better" casing.
-                // Specifically prioritize "IT Support" over "it support"
                 if (val === "IT Support") {
                     map.set(key, val);
                 } else if (val[0] === val[0].toUpperCase() && map.get(key)[0] !== map.get(key)[0].toUpperCase()) {
-                     // General rule: Prefer capitalized versions
-                     map.set(key, val);
+                      map.set(key, val);
                 }
             }
         });
         return Array.from(map.values()).sort();
     };
 
-    // Derived Unique Lists using the cleaner function
     const uniqueGroups = useMemo(() => getUniqueOptions('group'), [employees]);
     const uniqueSections = useMemo(() => getUniqueOptions('section'), [employees]);
     const uniqueClasses = useMemo(() => getUniqueOptions('class'), [employees]);
@@ -118,14 +112,13 @@ export default function PrintOptionsModal({
     const isLandscape = totalColumns > 8;
     const rowsPerPage = isLandscape ? ROWS_LANDSCAPE : ROWS_PORTRAIT;
 
-    // -- Filter Logic (Case Insensitive) --
+    // -- Filter Logic --
     const filteredData = useMemo(() => {
         if (exportScope === 'all') return employees;
         if (!scopeValue) return employees;
         
         return employees.filter(emp => {
             const val = emp[exportScope];
-            // Compare normalized lowercase strings to catch all variations
             return val && String(val).trim().toLowerCase() === scopeValue.trim().toLowerCase();
         });
     }, [employees, exportScope, scopeValue]);
@@ -240,7 +233,6 @@ export default function PrintOptionsModal({
                         <h3 className="text-xl font-bold text-white mb-2">Generating PDF...</h3>
                         <p className="text-slate-400 text-sm mb-6">Processing page {currentProcessingPage} of {pages.length}</p>
                         
-                        {/* Progress Bar */}
                         <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
                             <div 
                                 className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out" 
@@ -304,7 +296,6 @@ export default function PrintOptionsModal({
                                         ))}
                                     </div>
                                     
-                                    {/* Dynamic Select Input with Animation */}
                                     <div className={`mt-4 transition-all duration-300 ${exportScope !== 'all' ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none h-0'}`}>
                                          <div className="relative">
                                             <select 
@@ -313,7 +304,6 @@ export default function PrintOptionsModal({
                                                 className="w-full p-3 pl-4 border border-slate-200 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none shadow-sm text-slate-700"
                                             >
                                                 <option value="">Select Specific {exportScope}...</option>
-                                                {/* Use our internally cleaned unique lists */}
                                                 {exportScope === 'group' && uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
                                                 {exportScope === 'section' && uniqueSections.map(s => <option key={s} value={s}>{s}</option>)}
                                                 {exportScope === 'class' && uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
@@ -434,10 +424,12 @@ export default function PrintOptionsModal({
                             <button 
                                 onClick={handleDownloadPDF} 
                                 disabled={filteredData.length === 0 || isGenerating} 
-                                className="px-8 py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:shadow-indigo-200 flex items-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
+                                className="px-4 md:px-8 py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:shadow-indigo-200 flex items-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
                             >
                                 {isGenerating ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <PrinterIcon className="h-4 w-4" />}
-                                {isGenerating ? 'Processing...' : 'Download PDF'}
+                                <span className="hidden md:inline">
+                                    {isGenerating ? 'Processing...' : 'Download PDF'}
+                                </span>
                             </button>
                         </div>
                     </div>
