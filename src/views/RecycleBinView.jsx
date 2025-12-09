@@ -110,11 +110,16 @@ export default function RecycleBinView({ employees, loading, onRestore, onPerman
     const filtered = useMemo(() => {
         if (!employees) return [];
         const lowerTerm = searchTerm.toLowerCase();
-        return employees.filter(e => 
-            e.name?.toLowerCase().includes(lowerTerm) || 
-            e.studentId?.toLowerCase().includes(lowerTerm) ||
-            e.class?.toLowerCase().includes(lowerTerm) // Added search by Class
-        );
+        
+        return employees.filter(e => {
+            // Safe check for Name (Khmer), Latin Name (English), ID, and Class
+            const nameMatch = e.name?.toLowerCase().includes(lowerTerm);
+            const latinNameMatch = e.latinName?.toLowerCase().includes(lowerTerm);
+            const idMatch = e.studentId?.toLowerCase().includes(lowerTerm);
+            const classMatch = e.class?.toLowerCase().includes(lowerTerm);
+
+            return nameMatch || latinNameMatch || idMatch || classMatch;
+        });
     }, [employees, searchTerm]);
 
     if (loading) return (
