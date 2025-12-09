@@ -32,10 +32,8 @@ const DEFAULT_COLUMNS = [
 export default function PrintOptionsModal({
     isOpen,
     onClose,
-    employees = [],
-    uniqueGroups,
-    uniqueSections,
-    uniqueClasses
+    employees = []
+    // Note: We calculate unique lists inside to handle deduplication logic better
 }) {
     // -- State --
     const [reportTitle] = useState('Digital Industry');
@@ -46,7 +44,7 @@ export default function PrintOptionsModal({
     const [isGenerating, setIsGenerating] = useState(false);
     const [progress, setProgress] = useState(0);
     const [currentProcessingPage, setCurrentProcessingPage] = useState(0);
-    const [toast, setToast] = useState(null); // { type: 'success' | 'error', message: '' }
+    const [toast, setToast] = useState(null); 
 
     const [dataColumns, setDataColumns] = useState(
         DEFAULT_COLUMNS.map(c => ({
@@ -82,17 +80,54 @@ export default function PrintOptionsModal({
         setCustomColumns(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
     };
 
+    // -- Helper: Get Unique & Cleaned Options (Merges "it support" and "IT Support") --
+    const getUniqueOptions = (field) => {
+        const map = new Map();
+        employees.forEach(emp => {
+            const rawVal = emp[field];
+            if (!rawVal) return;
+            
+            const val = String(rawVal).trim();
+            const key = val.toLowerCase();
+            
+            // If key doesn't exist, set it.
+            if (!map.has(key)) {
+                map.set(key, val);
+            } else {
+                // If it exists, check if we have a "Better" casing.
+                // Specifically prioritize "IT Support" over "it support"
+                if (val === "IT Support") {
+                    map.set(key, val);
+                } else if (val[0] === val[0].toUpperCase() && map.get(key)[0] !== map.get(key)[0].toUpperCase()) {
+                     // General rule: Prefer capitalized versions
+                     map.set(key, val);
+                }
+            }
+        });
+        return Array.from(map.values()).sort();
+    };
+
+    // Derived Unique Lists using the cleaner function
+    const uniqueGroups = useMemo(() => getUniqueOptions('group'), [employees]);
+    const uniqueSections = useMemo(() => getUniqueOptions('section'), [employees]);
+    const uniqueClasses = useMemo(() => getUniqueOptions('class'), [employees]);
+
     // -- Derived State --
     const activeDataColumns = dataColumns.filter(c => c.selected);
     const totalColumns = activeDataColumns.length + customColumns.length;
     const isLandscape = totalColumns > 8;
     const rowsPerPage = isLandscape ? ROWS_LANDSCAPE : ROWS_PORTRAIT;
 
-    // -- Filter Logic --
+    // -- Filter Logic (Case Insensitive) --
     const filteredData = useMemo(() => {
         if (exportScope === 'all') return employees;
         if (!scopeValue) return employees;
-        return employees.filter(emp => emp[exportScope] === scopeValue);
+        
+        return employees.filter(emp => {
+            const val = emp[exportScope];
+            // Compare normalized lowercase strings to catch all variations
+            return val && String(val).trim().toLowerCase() === scopeValue.trim().toLowerCase();
+        });
     }, [employees, exportScope, scopeValue]);
 
     // -- PAGINATION LOGIC --
@@ -110,7 +145,6 @@ export default function PrintOptionsModal({
         setProgress(0);
         setCurrentProcessingPage(0);
         
-        // Small delay to allow UI to render the loader
         await new Promise(resolve => setTimeout(resolve, 500));
 
         try {
@@ -155,17 +189,13 @@ export default function PrintOptionsModal({
                 if (i > 0) doc.addPage();
                 doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
 
-                // Update Progress
                 const percent = Math.round(((i + 1) / totalPages) * 100);
                 setProgress(percent);
             }
 
             doc.save(`${reportTitle.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
-            
-            // Show Success
             setToast({ type: 'success', message: 'PDF Downloaded Successfully!' });
             
-            // Short delay before closing loader to show 100%
             setTimeout(() => {
                 setIsGenerating(false);
             }, 800);
@@ -283,6 +313,7 @@ export default function PrintOptionsModal({
                                                 className="w-full p-3 pl-4 border border-slate-200 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none shadow-sm text-slate-700"
                                             >
                                                 <option value="">Select Specific {exportScope}...</option>
+                                                {/* Use our internally cleaned unique lists */}
                                                 {exportScope === 'group' && uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
                                                 {exportScope === 'section' && uniqueSections.map(s => <option key={s} value={s}>{s}</option>)}
                                                 {exportScope === 'class' && uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
@@ -294,7 +325,7 @@ export default function PrintOptionsModal({
                                     </div>
                                 </section>
 
-                                {/* Extra Columns Section moved here for balance */}
+                                {/* Extra Columns Section */}
                                 <section>
                                     <div className="flex justify-between items-end mb-3">
                                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -467,7 +498,6 @@ export default function PrintOptionsModal({
                             height: 100%; /* Important for flex child */
                         }
 
-                        /* --- THIS FIXES THE CHECKBOX CENTERING --- */
                         .custom-cell-center {
                             display: flex;
                             justify-content: center;
@@ -534,7 +564,6 @@ export default function PrintOptionsModal({
                                                     ))}
                                                     {customColumns.map((col) => (
                                                         <td key={col.id}>
-                                                            {/* Apply the Flexbox centering class wrapper */}
                                                             <div className="custom-cell-center">
                                                                 {col.type === 'checkbox' && <div className="box-check"></div>}
                                                             </div>
