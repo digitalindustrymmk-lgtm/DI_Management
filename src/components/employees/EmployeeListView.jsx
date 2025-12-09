@@ -5,7 +5,7 @@ import {
 import SortOptionsModal from '../common/SortOptionsModal';
 import SortableHeader from '../common/SortableHeader';
 import PaginationControls from '../common/PaginationControls';
-import PrintOptionsModal from '../common/PrintOptionsModal'; // <--- NEW IMPORT
+import PrintOptionsModal from '../common/PrintOptionsModal';
 import EmployeeCard from './EmployeeCard';
 import EmployeeRow from './EmployeeRow';
 import TrashRow from './TrashRow';
@@ -203,13 +203,26 @@ const EmployeeListView = ({
                             <Trash2Icon className="h-6 w-6" />
                         </button>
                     )}
+                    
+                    {/* NEW: PDF Download Button for Mobile */}
+                    <button 
+                        onClick={() => setIsPrintModalOpen(true)}
+                        className="h-14 w-14 bg-white text-slate-700 rounded-full shadow-2xl flex items-center justify-center border border-slate-100 transition-all duration-300 active:scale-95"
+                        style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}
+                    >
+                        <PrinterIcon className="h-6 w-6" />
+                    </button>
+
                     <button onClick={toggleSelectAll} className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`} style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}><CheckSquareIcon className="h-6 w-6" /></button>
+                    
                     <button onClick={() => setShowMobileSearch(!showMobileSearch)} className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${showMobileSearch ? 'bg-slate-700 text-white rotate-90' : 'bg-white text-indigo-600 border border-indigo-100'}`} style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}>{showMobileSearch ? <PlusIcon className="h-6 w-6 rotate-45" /> : <SearchIcon className="h-6 w-6" />}</button>
+                    
                     <button onClick={onCreate} className="h-14 w-14 bg-indigo-600 text-white rounded-full flex items-center justify-center active:scale-95 transition-transform" style={{ boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.5)' }}><PlusIcon className="h-7 w-7" /></button>
                 </div>
             )}
 
-            <div className={`md:hidden fixed inset-0 z-[60] bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMobileSearch ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileSearch(false)}>
+            {/* FIXED: Z-Index updated from z-[60] to z-[100] to sit ABOVE the floating buttons */}
+            <div className={`md:hidden fixed inset-0 z-[100] bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMobileSearch ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileSearch(false)}>
                 <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-5 shadow-2xl transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : 'translate-y-full'}`} onClick={e => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-bold text-slate-700 text-lg">Search & Filter</h3>
@@ -353,7 +366,6 @@ const EmployeeListView = ({
                                                     ) : "Action"}
                                                 </th>
                                                 
-                                                {/* --- FIXED: Sticky + Sortable Header (Removed nested <th>) --- */}
                                                 <SortableHeader 
                                                     label="Name / Profile" 
                                                     sortKey="name" 
