@@ -23,10 +23,18 @@ const TrashCard = ({ employee, onRestore, onPermanentDelete }) => (
                     <p className="text-xs text-slate-500 font-medium uppercase mt-0.5">{employee.latinName}</p>
                 </div>
             </div>
-            {/* ID Badge */}
-            <span className="bg-slate-100 text-slate-500 text-xs font-mono font-bold px-2 py-1 rounded-md">
-                {employee.studentId}
-            </span>
+            
+            {/* ID & Class Badges */}
+            <div className="flex flex-col items-end gap-1.5">
+                <span className="bg-slate-100 text-slate-500 text-xs font-mono font-bold px-2 py-1 rounded-md">
+                    {employee.studentId}
+                </span>
+                {employee.class && (
+                    <span className="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-md border border-indigo-100 uppercase tracking-wide">
+                        {employee.class}
+                    </span>
+                )}
+            </div>
         </div>
 
         {/* Action Buttons (Full Width on Mobile) */}
@@ -70,6 +78,12 @@ const TrashTableRow = ({ employee, onRestore, onPermanentDelete }) => (
                 {employee.studentId}
             </span>
         </td>
+        {/* Class Column */}
+        <td className="px-6 py-4">
+            <div className="text-sm font-semibold text-slate-600">
+                {employee.class || <span className="text-slate-300 italic">N/A</span>}
+            </div>
+        </td>
         <td className="px-6 py-4">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-500 border border-red-100 text-xs font-medium">
                 <AlertCircleIcon className="w-3 h-3"/> Deleted
@@ -95,9 +109,11 @@ export default function RecycleBinView({ employees, loading, onRestore, onPerman
 
     const filtered = useMemo(() => {
         if (!employees) return [];
+        const lowerTerm = searchTerm.toLowerCase();
         return employees.filter(e => 
-            e.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            e.studentId?.toLowerCase().includes(searchTerm.toLowerCase())
+            e.name?.toLowerCase().includes(lowerTerm) || 
+            e.studentId?.toLowerCase().includes(lowerTerm) ||
+            e.class?.toLowerCase().includes(lowerTerm) // Added search by Class
         );
     }, [employees, searchTerm]);
 
@@ -125,7 +141,7 @@ export default function RecycleBinView({ employees, loading, onRestore, onPerman
                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                     <input 
                         type="text" 
-                        placeholder="Search deleted items..." 
+                        placeholder="Search name, ID, or class..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all shadow-sm"
@@ -166,6 +182,7 @@ export default function RecycleBinView({ employees, loading, onRestore, onPerman
                             <tr>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Employee</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID Code</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Class</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                             </tr>
