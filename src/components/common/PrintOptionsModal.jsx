@@ -11,10 +11,6 @@ import logoImage from "../../assets/di3-copy.png";
 
 // -- CONFIGURATION --
 
-// Reduced row counts to ensure a safety margin at the bottom of the page.
-const ROWS_PORTRAIT = 33;   // Safe limit for A4 Portrait
-const ROWS_LANDSCAPE = 21;  // Safe limit for A4 Landscape
-
 const DEFAULT_COLUMNS = [
     { key: 'index', label: 'NO.' },
     { key: 'studentId', label: 'ID' },
@@ -30,6 +26,9 @@ const DEFAULT_COLUMNS = [
     { key: 'telegram', label: 'Telegram' },
 ];
 
+// UPDATED: Only 'position' and 'section' are allowed to wrap text.
+const WRAP_COLUMNS = ['position', 'section'];
+
 export default function PrintOptionsModal({
     isOpen,
     onClose,
@@ -42,7 +41,7 @@ export default function PrintOptionsModal({
     
     // -- Loading & Toast State --
     const [isGenerating, setIsGenerating] = useState(false);
-    const [loadingAction, setLoadingAction] = useState(''); // 'download', 'print', or 'excel'
+    const [loadingAction, setLoadingAction] = useState(''); 
     const [progress, setProgress] = useState(0);
     const [currentProcessingPage, setCurrentProcessingPage] = useState(0);
     const [toast, setToast] = useState(null); 
@@ -50,6 +49,7 @@ export default function PrintOptionsModal({
     const [dataColumns, setDataColumns] = useState(
         DEFAULT_COLUMNS.map(c => ({
             ...c,
+            // Default selected columns
             selected: ['index', 'studentId', 'name', 'gender', 'position', 'group'].includes(c.key)
         }))
     );
@@ -59,7 +59,7 @@ export default function PrintOptionsModal({
     // -- Toast Timer --
     useEffect(() => {
         if (toast) {
-            const timer = setTimeout(() => setToast(null), 3000);
+            const timer = setTimeout(() => setToast(null), 4000); 
             return () => clearTimeout(timer);
         }
     }, [toast]);
@@ -111,12 +111,9 @@ export default function PrintOptionsModal({
     // -- Derived State --
     const activeDataColumns = dataColumns.filter(c => c.selected);
     const totalColumns = activeDataColumns.length + customColumns.length;
+    
+    // Logic: If columns > 8, force landscape
     const isLandscape = totalColumns > 8;
-
-    // --- DYNAMIC ROWS CALCULATION ---
-    const rowsPerPage = useMemo(() => {
-        return isLandscape ? ROWS_LANDSCAPE : ROWS_PORTRAIT; 
-    }, [isLandscape]);
 
     // -- Filter Logic --
     const filteredData = useMemo(() => {
@@ -129,122 +126,75 @@ export default function PrintOptionsModal({
         });
     }, [employees, exportScope, scopeValue]);
 
-    // -- PAGINATION LOGIC --
+    // --- UPDATED: FIXED ROW COUNT PAGINATION ---
     const pages = useMemo(() => {
         const chunks = [];
-        for (let i = 0; i < filteredData.length; i += rowsPerPage) {
-            chunks.push(filteredData.slice(i, i + rowsPerPage));
-        }
-        return chunks;
-    }, [filteredData, rowsPerPage]);
+        
+        // STRICT ROW LIMITS
+        const ROWS_PER_PAGE = isLandscape ? 15 : 24;
 
-    // -- EXPORT TO EXCEL (PRO STYLING) --
+        for (let i = 0; i < filteredData.length; i += ROWS_PER_PAGE) {
+            chunks.push(filteredData.slice(i, i + ROWS_PER_PAGE));
+        }
+
+        return chunks;
+    }, [filteredData, isLandscape]);
+
+    // -- EXPORT TO EXCEL --
     const handleExportExcel = () => {
         setLoadingAction('excel');
         setIsGenerating(true);
 
         setTimeout(() => {
             try {
-                // 1. Prepare Headers & Data
                 const headers = [
                     ...activeDataColumns.map(col => col.label),
                     ...customColumns.map(col => col.label)
                 ];
-                
                 const totalColCount = headers.length;
-
-                // 2. Build HTML Table Rows with Inline CSS
                 let tableRows = "";
                 
                 filteredData.forEach((emp, index) => {
-                    // Zebra Striping Logic
                     const bgColor = index % 2 === 0 ? '#ffffff' : '#f8fafc';
-                    
                     let rowCells = "";
-                    
-                    // Data Columns
                     activeDataColumns.forEach(col => {
                         let cellValue = col.key === 'index' ? index + 1 : (emp[col.key] || '');
                         
+                        // Check if this column allows wrapping
+                        const isWrap = WRAP_COLUMNS.includes(col.key);
+                        const wrapStyle = isWrap ? "white-space: normal; word-wrap: break-word;" : "white-space: nowrap;";
+
                         rowCells += `
-                            <td style="
-                                background-color: ${bgColor}; 
-                                padding: 12px; 
-                                border: 1px solid #cbd5e1; 
-                                text-align: center; 
-                                vertical-align: middle; 
-                                font-size: 11pt;
-                                color: #334155;
-                            ">
+                            <td style="background-color: ${bgColor}; padding: 12px; border: 1px solid #cbd5e1; text-align: center; vertical-align: middle; font-size: 14pt; color: #334155; ${wrapStyle}">
                                 ${cellValue}
                             </td>`;
                     });
-
-                    // Custom Columns (Empty for printing/checking)
                     customColumns.forEach(() => {
                         rowCells += `<td style="background-color: ${bgColor}; border: 1px solid #cbd5e1;"></td>`;
                     });
-
                     tableRows += `<tr>${rowCells}</tr>`;
                 });
 
-                // 3. Construct Full HTML Template with "Cool" Styles
                 const excelTemplate = `
                     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
                     <head>
                         <meta charset="UTF-8">
                         <style>
                             table { border-collapse: collapse; width: 100%; font-family: 'Calibri', 'Arial', sans-serif; }
-                            
-                            /* TITLE ROW STYLE */
-                            .title-row {
-                                background-color: #e0e7ff; /* Light Indigo */
-                                color: #312e81; /* Dark Indigo */
-                                font-size: 20pt;
-                                font-weight: bold;
-                                text-align: center;
-                                height: 80px;
-                                vertical-align: middle;
-                                border: 1px solid #cbd5e1;
-                            }
-
-                            /* HEADER STYLE - COOL & BOLD */
-                            th {
-                                background-color: #4338ca; /* Indigo 700 */
-                                color: #ffffff;
-                                font-weight: bold;
-                                font-size: 14pt;
-                                height: 50px;
-                                border: 1px solid #312e81;
-                                vertical-align: middle;
-                                text-align: center;
-                                text-transform: uppercase;
-                            }
+                            .title-row { background-color: #e0e7ff; color: #312e81; font-size: 24pt; font-weight: bold; text-align: center; height: 90px; vertical-align: middle; border: 1px solid #cbd5e1; }
+                            th { background-color: #4338ca; color: #ffffff; font-weight: bold; font-size: 16pt; height: 60px; border: 1px solid #312e81; vertical-align: middle; text-align: center; text-transform: uppercase; }
                         </style>
                     </head>
                     <body>
                         <table>
-                            <tr>
-                                <td colspan="${totalColCount}" class="title-row">
-                                    ${reportTitle.toUpperCase()} REPORT
-                                </td>
-                            </tr>
-                            
-                            <thead>
-                                <tr>
-                                    ${headers.map(h => `<th>${h}</th>`).join('')}
-                                </tr>
-                            </thead>
-                            
-                            <tbody>
-                                ${tableRows}
-                            </tbody>
+                            <tr><td colspan="${totalColCount}" class="title-row">${reportTitle.toUpperCase()} REPORT</td></tr>
+                            <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                            <tbody>${tableRows}</tbody>
                         </table>
                     </body>
                     </html>
                 `;
 
-                // 4. Create Blob and Download
                 const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel' });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
@@ -261,20 +211,19 @@ export default function PrintOptionsModal({
                 setIsGenerating(false);
                 setLoadingAction('');
             }
-        }, 1000); // Slight delay for UX
+        }, 1000);
     };
 
     // -- GENERATE PDF (Download or Print) --
     const handleGeneratePDF = async (action = 'download') => {
         setIsGenerating(true);
-        setLoadingAction(action);
-        setProgress(0);
-        setCurrentProcessingPage(0);
+        setLoadingAction('checking'); 
         
         await new Promise(resolve => setTimeout(resolve, 800));
 
         try {
             const pageElements = document.querySelectorAll('.printable-page');
+            
             if (pageElements.length === 0) {
                 setToast({ type: 'error', message: 'No pages found to print.' });
                 setIsGenerating(false);
@@ -282,6 +231,38 @@ export default function PrintOptionsModal({
                 return;
             }
 
+            // --- SAFETY CHECK (Final Verification) ---
+            for (let i = 0; i < pageElements.length; i++) {
+                const page = pageElements[i];
+                const content = page.querySelector('.pdf-wrapper');
+                
+                if (!content) continue;
+
+                if (content.scrollWidth > (page.clientWidth + 5)) {
+                    setToast({ 
+                        type: 'error', 
+                        message: `Page ${i + 1} is too wide! Content is cut off. Please uncheck some columns.` 
+                    });
+                    setIsGenerating(false);
+                    setLoadingAction('');
+                    return; 
+                }
+
+                if (content.scrollHeight > (page.clientHeight + 5)) {
+                    setToast({ 
+                        type: 'error', 
+                        message: `Page ${i + 1} is too tall! Please reduce columns or data slightly.` 
+                    });
+                    setIsGenerating(false);
+                    setLoadingAction('');
+                    return; 
+                }
+            }
+            // --------------------
+
+            setLoadingAction(action);
+            setProgress(0);
+            setCurrentProcessingPage(0);
             const totalPages = pageElements.length;
             const capturedImages = [];
 
@@ -293,7 +274,7 @@ export default function PrintOptionsModal({
                 const captureHeight = isLandscape ? 1100 : 1555;
 
                 const canvas = await html2canvas(page, {
-                    scale: 2,
+                    scale: 2, 
                     useCORS: true,
                     logging: false,
                     windowWidth: captureWidth,
@@ -348,21 +329,9 @@ export default function PrintOptionsModal({
                         <head>
                             <title>Print Report</title>
                             <style>
-                                @page { 
-                                    size: ${cssOrientation}; 
-                                    margin: 0; 
-                                }
-                                body { 
-                                    margin: 0; 
-                                    padding: 0; 
-                                }
-                                img { 
-                                    width: 100%; 
-                                    height: 100vh;
-                                    object-fit: contain;
-                                    display: block; 
-                                    page-break-after: always;
-                                }
+                                @page { size: ${cssOrientation}; margin: 0; }
+                                body { margin: 0; padding: 0; }
+                                img { width: 100%; height: 100vh; object-fit: contain; display: block; page-break-after: always; }
                             </style>
                         </head>
                         <body>
@@ -376,7 +345,6 @@ export default function PrintOptionsModal({
                     setToast({ type: 'success', message: 'Print Dialog Opened' });
                     setIsGenerating(false);
                     setLoadingAction('');
-                    
                     setTimeout(function() {
                         iframe.contentWindow.focus();
                         iframe.contentWindow.print();
@@ -405,7 +373,7 @@ export default function PrintOptionsModal({
                         {toast.type === 'success' ? <CheckIcon className="h-6 w-6" /> : <AlertCircleIcon className="h-6 w-6" />}
                     </div>
                     <div>
-                        <h4 className="font-bold text-lg">{toast.type === 'success' ? 'Success' : 'Error'}</h4>
+                        <h4 className="font-bold text-lg">{toast.type === 'success' ? 'Success' : 'Attention'}</h4>
                         <p className="text-sm font-medium opacity-90">{toast.message}</p>
                     </div>
                 </div>
@@ -418,7 +386,7 @@ export default function PrintOptionsModal({
                         <div className="relative mb-6">
                             <div className="h-20 w-20 border-4 border-slate-600 rounded-full mx-auto"></div>
                             <div className="h-20 w-20 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto absolute top-0 left-0 right-0 animate-spin"></div>
-                            {loadingAction !== 'excel' && (
+                            {loadingAction !== 'excel' && loadingAction !== 'checking' && (
                                 <div className="absolute inset-0 flex items-center justify-center font-bold text-white text-lg">
                                     {progress}%
                                 </div>
@@ -426,15 +394,18 @@ export default function PrintOptionsModal({
                         </div>
                         
                         <h3 className="text-xl font-bold text-white mb-2">
-                            {loadingAction === 'print' ? 'Preparing to Print...' : 
+                            {loadingAction === 'checking' ? 'Checking Layout...' : 
+                             loadingAction === 'print' ? 'Preparing to Print...' : 
                              loadingAction === 'excel' ? 'Exporting Excel...' : 
                              'Generating PDF...'}
                         </h3>
                         <p className="text-slate-400 text-sm mb-6">
-                            {loadingAction === 'excel' ? 'Please wait...' : `Processing page ${currentProcessingPage} of ${pages.length}`}
+                            {loadingAction === 'checking' ? 'Ensuring data fits on A4...' :
+                             loadingAction === 'excel' ? 'Please wait...' : 
+                             `Processing page ${currentProcessingPage} of ${pages.length}`}
                         </p>
                         
-                        {loadingAction !== 'excel' && (
+                        {loadingAction !== 'excel' && loadingAction !== 'checking' && (
                             <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
                                 <div 
                                     className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out" 
@@ -681,14 +652,13 @@ export default function PrintOptionsModal({
                         .printable-page {
                             width: ${isLandscape ? '1555px' : '1100px'};
                             height: ${isLandscape ? '1100px' : '1555px'}; 
-                            padding: 40px;
+                            padding: 50px; 
                             background: white;
                             position: relative;
                             box-sizing: border-box;
-                            overflow: hidden;
+                            overflow: hidden; 
                         }
 
-                        /* FORCE LANDSCAPE PRINT IF COLUMNS > 8 */
                         @media print {
                             @page {
                                 size: ${isLandscape ? 'landscape' : 'portrait'};
@@ -700,46 +670,54 @@ export default function PrintOptionsModal({
                             }
                         }
 
-                        .pdf-wrapper { font-family: 'Inter', 'Battambang', sans-serif; color: #0f172a; height: 100%; }
+                        .pdf-wrapper { 
+                            font-family: 'Inter', 'Battambang', sans-serif; 
+                            color: #0f172a; 
+                            height: 100%; 
+                            display: flex; 
+                            flex-direction: column;
+                        }
                         
                         .header-container {
                             display: flex; justify-content: space-between; align-items: flex-end;
-                            margin-bottom: 20px; border-bottom: 2px solid #0f172a; padding-bottom: 15px;
+                            margin-bottom: 25px; border-bottom: 3px solid #0f172a; padding-bottom: 20px;
+                            flex-shrink: 0;
                         }
 
-                        .header-left { display: flex; align-items: center; gap: 15px; }
+                        .header-left { display: flex; align-items: center; gap: 20px; }
                         
                         table { 
                             width: 100%; 
                             border-collapse: collapse; 
-                            border: 1px solid #cbd5e1; 
-                            table-layout: auto; /* Ensures nowrap takes effect */
+                            border: 2px solid #cbd5e1; 
+                            table-layout: auto; 
+                            flex-shrink: 0;
                         }
                         
                         th {
                             background-color: #f1f5f9; 
                             color: #334155; 
-                            font-weight: 700;
+                            font-weight: 800; 
                             text-transform: uppercase; 
-                            padding: 10px 5px;
+                            padding: 12px 8px; 
                             text-align: center;
-                            font-size: 18px; 
-                            border: 1px solid #cbd5e1; 
-                            white-space: nowrap; /* Header nowrap */
+                            font-size: 22px; 
+                            border: 1px solid #94a3b8; 
+                            white-space: nowrap; 
                         }
 
-                        /* --- UPDATED CSS FOR NOWRAP --- */
                         td {
-                            padding: 8px 5px; 
+                            padding: 10px 8px; 
                             vertical-align: middle;
-                            font-size: 15px; /* Slightly reduced font size to fit more text */
-                            border: 1px solid #e2e8f0; 
+                            font-size: 18px; 
+                            border: 1px solid #cbd5e1; 
                             text-align: center; 
-                            height: 100%; 
-                            white-space: nowrap; /* Forces text to one line */
-                            overflow: hidden;    /* Prevents spilling over */
-                            text-overflow: ellipsis; /* Adds ... if really too long */
-                            max-width: 300px; /* Safety limit */
+                            
+                            /* DEFAULT TO NO WRAP */
+                            white-space: nowrap;
+                            overflow: hidden; 
+                            text-overflow: ellipsis; 
+                            max-width: 300px;
                         }
 
                         .custom-cell-center {
@@ -748,21 +726,21 @@ export default function PrintOptionsModal({
                             align-items: center;
                             width: 100%;
                             height: 100%;
-                            min-height: 24px; 
+                            min-height: 28px; 
                         }
                         
                         tr:nth-child(even) { background-color: #f8fafc; }
 
                         .box-check {
-                            width: 18px; height: 18px; 
+                            width: 22px; height: 22px; 
                             border: 2px solid #94a3b8; 
-                            border-radius: 4px; 
+                            border-radius: 6px; 
                             display: block; 
                         }
                         
                         .footer-text {
                             position: absolute; bottom: 30px; right: 40px;
-                            text-align: right; font-size: 10px; color: #64748b; font-weight: bold;
+                            text-align: right; font-size: 12px; color: #64748b; font-weight: bold;
                         }
                     `}</style>
 
@@ -771,17 +749,17 @@ export default function PrintOptionsModal({
                             <div className="pdf-wrapper">
                                 <div className="header-container">
                                     <div className="header-left">
-                                        <img src={logoImage} alt="Logo" style={{ height: '50px', objectFit: 'contain' }} />
+                                        <img src={logoImage} alt="Logo" style={{ height: '70px', objectFit: 'contain' }} />
                                         <div>
-                                            <h1 style={{ fontSize: '24px', fontWeight: '800', textTransform: 'uppercase', margin: 0 }} className="font-battambang">
+                                            <h1 style={{ fontSize: '34px', fontWeight: '800', textTransform: 'uppercase', margin: 0 }} className="font-battambang">
                                                 {reportTitle}
                                             </h1>
-                                            <span style={{ fontSize: '10px', color: '#64748b' }}>Generated by HR PRO System</span>
+                                            <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 'bold' }}>Generated by HR PRO System</span>
                                         </div>
                                     </div>
-                                    <div style={{ textAlign: 'right', fontSize: '10px', color: '#64748b' }}>
-                                        <p>DATE: <span style={{ color: '#0f172a' }}>{today}</span></p>
-                                        {scopeValue && <p className="uppercase">FILTER: <span style={{ color: '#0f172a' }}>{scopeValue}</span></p>}
+                                    <div style={{ textAlign: 'right', fontSize: '14px', color: '#64748b' }}>
+                                        <p>DATE: <span style={{ color: '#0f172a', fontWeight: 'bold' }}>{today}</span></p>
+                                        {scopeValue && <p className="uppercase">FILTER: <span style={{ color: '#0f172a', fontWeight: 'bold' }}>{scopeValue}</span></p>}
                                     </div>
                                 </div>
 
@@ -798,12 +776,20 @@ export default function PrintOptionsModal({
                                     </thead>
                                     <tbody>
                                         {pageData.map((emp, idx) => {
-                                            const globalIndex = (pageIndex * rowsPerPage) + idx + 1;
                                             return (
                                                 <tr key={emp.id || idx}>
                                                     {activeDataColumns.map((col) => (
-                                                        <td key={col.key} className="font-battambang">
-                                                            {col.key === 'index' ? globalIndex : (emp[col.key] || '-')}
+                                                        // SELECTIVE WRAPPING LOGIC APPLIED HERE
+                                                        <td 
+                                                            key={col.key} 
+                                                            className="font-battambang"
+                                                            style={
+                                                                WRAP_COLUMNS.includes(col.key) 
+                                                                ? { whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: '250px' } 
+                                                                : {}
+                                                            }
+                                                        >
+                                                            {col.key === 'index' ? ((pageIndex * (isLandscape ? 14 : 17)) + idx + 1) : (emp[col.key] || '-')}
                                                         </td>
                                                     ))}
                                                     {customColumns.map((col) => (
