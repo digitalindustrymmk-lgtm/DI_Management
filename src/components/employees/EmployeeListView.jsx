@@ -67,15 +67,47 @@ const EmployeeListView = ({
         setSelectedIds(new Set());
     }, [isRecycleBin]);
     
+    // --- DRAG TO SCROLL LOGIC ---
     const tableContainerRef = useRef(null);
     const isDragging = useRef(false);
     const startX = useRef(0);
     const scrollLeft = useRef(0);
 
-    const onMouseDown = (e) => { isDragging.current = true; if(tableContainerRef.current) { startX.current = e.pageX - tableContainerRef.current.offsetLeft; scrollLeft.current = tableContainerRef.current.scrollLeft; tableContainerRef.current.classList.add('cursor-grabbing'); } };
-    const onMouseLeave = () => { isDragging.current = false; if(tableContainerRef.current) tableContainerRef.current.classList.remove('cursor-grabbing'); };
-    const onMouseUp = () => { isDragging.current = false; if(tableContainerRef.current) tableContainerRef.current.classList.remove('cursor-grabbing'); };
-    const onMouseMove = (e) => { if (!isDragging.current) return; e.preventDefault(); if(tableContainerRef.current) { const x = e.pageX - tableContainerRef.current.offsetLeft; const walk = (x - startX.current) * 2; tableContainerRef.current.scrollLeft = scrollLeft.current - walk; } };
+    const onMouseDown = (e) => { 
+        isDragging.current = true; 
+        if(tableContainerRef.current) { 
+            startX.current = e.pageX - tableContainerRef.current.offsetLeft; 
+            scrollLeft.current = tableContainerRef.current.scrollLeft; 
+            tableContainerRef.current.classList.add('cursor-grabbing'); 
+            tableContainerRef.current.classList.add('select-none'); // Prevent text selection while dragging
+        } 
+    };
+    
+    const onMouseLeave = () => { 
+        isDragging.current = false; 
+        if(tableContainerRef.current) {
+            tableContainerRef.current.classList.remove('cursor-grabbing'); 
+            tableContainerRef.current.classList.remove('select-none');
+        }
+    };
+    
+    const onMouseUp = () => { 
+        isDragging.current = false; 
+        if(tableContainerRef.current) {
+            tableContainerRef.current.classList.remove('cursor-grabbing'); 
+            tableContainerRef.current.classList.remove('select-none');
+        }
+    };
+    
+    const onMouseMove = (e) => { 
+        if (!isDragging.current) return; 
+        e.preventDefault(); 
+        if(tableContainerRef.current) { 
+            const x = e.pageX - tableContainerRef.current.offsetLeft; 
+            const walk = (x - startX.current) * 2; 
+            tableContainerRef.current.scrollLeft = scrollLeft.current - walk; 
+        } 
+    };
 
     // Derived Unique Values for Filters
     const uniqueGroups = useMemo(() => {
@@ -202,7 +234,6 @@ const EmployeeListView = ({
             />
 
             {/* --- MOBILE/TABLET FLOATING BUTTONS (Visible < 1024px / lg) --- */}
-            {/* These are hidden on large screens (lg:hidden) */}
             {!isRecycleBin && !isModalOpen && (
                 <div className="lg:hidden fixed bottom-6 right-6 flex flex-col gap-4 z-[90]">
                       {selectedIds.size > 0 && (
@@ -215,7 +246,6 @@ const EmployeeListView = ({
                         </button>
                     )}
                     
-                    {/* PDF Download Button */}
                     <button 
                         onClick={() => setIsPrintModalOpen(true)}
                         className="h-14 w-14 bg-white text-slate-700 rounded-full shadow-2xl flex items-center justify-center border border-slate-100 transition-all duration-300 active:scale-95 hover:text-indigo-600"
@@ -224,10 +254,8 @@ const EmployeeListView = ({
                         <PrinterIcon className="h-6 w-6" />
                     </button>
 
-                    {/* Select All Button */}
                     <button onClick={toggleSelectAll} className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${selectedIds.size > 0 && selectedIds.size === filteredEmployees.length ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`} style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}><CheckSquareIcon className="h-6 w-6" /></button>
                     
-                    {/* Search & Filter Trigger */}
                     <button 
                         onClick={() => setShowMobileSearch(true)} 
                         className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${showMobileSearch ? 'bg-slate-800 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`} 
@@ -236,13 +264,11 @@ const EmployeeListView = ({
                         <SearchIcon className="h-6 w-6" />
                     </button>
                     
-                    {/* Create New Report/Employee */}
                     <button onClick={onCreate} className="h-14 w-14 bg-indigo-600 text-white rounded-full flex items-center justify-center active:scale-95 transition-transform" style={{ boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.5)' }}><PlusIcon className="h-7 w-7" /></button>
                 </div>
             )}
 
             {/* --- MOBILE SEARCH OVERLAY (Visible < 1024px when toggled) --- */}
-            {/* This handles BOTH Name/ID search AND Filter dropdowns for mobile */}
             <div className={`lg:hidden fixed inset-0 z-[100] bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMobileSearch ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileSearch(false)}>
                 <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-5 shadow-2xl transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : 'translate-y-full'}`} onClick={e => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-4">
@@ -259,13 +285,11 @@ const EmployeeListView = ({
                     </div>
                     
                     <div className="flex flex-col gap-4">
-                        {/* Search Input (Moved here from top bar for mobile) */}
                         <div className="relative w-full group">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><SearchIcon className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" /></div>
                             <input type="text" className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200" placeholder="Search Name or ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
                         
-                        {/* Filters Grid */}
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 ml-1">Group</label>
@@ -307,16 +331,11 @@ const EmployeeListView = ({
             <div className="space-y-6 animate-fade-in relative min-h-[500px]">
                 
                 {/* --- UNIFIED HEADER (Desktop Only >= 1024px) --- */}
-                {/* HIDDEN ON MOBILE/TABLET (max-width 1023px) */}
                 <div className="hidden lg:block glass-panel rounded-3xl sticky top-0 z-40 transition-all duration-300 shadow-sm border border-slate-100">
                     
-                    {/* TOP ROW: Search, Filter Toggle, Desktop Actions */}
                     <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
                         
-                        {/* SEARCH & FILTER TOGGLE */}
                         <div className="flex gap-3 items-center w-full md:w-auto flex-1">
-                            
-                            {/* Search Input */}
                             <div className="relative w-full md:w-72 lg:w-96 group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <SearchIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
@@ -330,7 +349,6 @@ const EmployeeListView = ({
                                 />
                             </div>
 
-                            {/* Filter Toggle Button */}
                             <button 
                                 onClick={() => setShowFilters(!showFilters)} 
                                 className={`
@@ -349,7 +367,6 @@ const EmployeeListView = ({
                             </button>
                         </div>
 
-                        {/* DESKTOP RIGHT ACTIONS */}
                         <div className="flex items-center gap-3">
                             {!isRecycleBin && (
                                 <>
@@ -468,7 +485,8 @@ const EmployeeListView = ({
                                     <table className="min-w-full divide-y divide-slate-100">
                                         <thead className="bg-slate-50/80 backdrop-blur-md">
                                             <tr>
-                                                <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">
+                                                {/* FIXED COLUMN 1: CHECKBOX (Z-50 to stay on top) */}
+                                                <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-50 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">
                                                     {!isRecycleBin ? (
                                                         <div className="flex items-center gap-2">
                                                             <input 
@@ -482,12 +500,13 @@ const EmployeeListView = ({
                                                     ) : "Action"}
                                                 </th>
                                                 
+                                                {/* FIXED COLUMN 2: NAME (Z-40 to stay above scroll but below action) */}
                                                 <SortableHeader 
                                                     label="Name / Profile" 
                                                     sortKey="name" 
                                                     currentSort={sortConfig} 
                                                     onOpenSort={handleOpenSortModal} 
-                                                    className="px-0 py-0 sticky left-[88px] bg-slate-50 z-30 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]"
+                                                    className="px-0 py-0 sticky left-[88px] bg-slate-50 z-40 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]"
                                                 />
                                                 
                                                 <SortableHeader label="Latin Name" sortKey="latinName" currentSort={sortConfig} onOpenSort={handleOpenSortModal} />
