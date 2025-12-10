@@ -12,8 +12,8 @@ import logoImage from "../../assets/di3-copy.png";
 // -- CONFIGURATION --
 
 // Reduced row counts to ensure a safety margin at the bottom of the page.
-const ROWS_PORTRAIT = 36;   // Safe limit for A4 Portrait
-const ROWS_LANDSCAPE = 24;  // Safe limit for A4 Landscape
+const ROWS_PORTRAIT = 33;   // Safe limit for A4 Portrait
+const ROWS_LANDSCAPE = 21;  // Safe limit for A4 Landscape
 
 const DEFAULT_COLUMNS = [
     { key: 'index', label: 'NO.' },
@@ -713,6 +713,7 @@ export default function PrintOptionsModal({
                             width: 100%; 
                             border-collapse: collapse; 
                             border: 1px solid #cbd5e1; 
+                            table-layout: auto; /* Ensures nowrap takes effect */
                         }
                         
                         th {
@@ -722,18 +723,23 @@ export default function PrintOptionsModal({
                             text-transform: uppercase; 
                             padding: 10px 5px;
                             text-align: center;
-                            font-size: 14px; 
+                            font-size: 18px; 
                             border: 1px solid #cbd5e1; 
-                            white-space: nowrap;
+                            white-space: nowrap; /* Header nowrap */
                         }
 
+                        /* --- UPDATED CSS FOR NOWRAP --- */
                         td {
                             padding: 8px 5px; 
                             vertical-align: middle;
-                            font-size: 13px;
+                            font-size: 15px; /* Slightly reduced font size to fit more text */
                             border: 1px solid #e2e8f0; 
                             text-align: center; 
                             height: 100%; 
+                            white-space: nowrap; /* Forces text to one line */
+                            overflow: hidden;    /* Prevents spilling over */
+                            text-overflow: ellipsis; /* Adds ... if really too long */
+                            max-width: 300px; /* Safety limit */
                         }
 
                         .custom-cell-center {
