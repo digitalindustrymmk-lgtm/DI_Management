@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { 
     XIcon, PrinterIcon, Loader2Icon, PlusIcon, Trash2Icon, 
-    CheckIcon, AlertCircleIcon, DownloadIcon 
+    CheckIcon, AlertCircleIcon, DownloadIcon, FileSpreadsheetIcon 
 } from '../Icons'; 
 
 // --- IMPORT YOUR LOGO HERE ---
@@ -12,7 +12,6 @@ import logoImage from "../../assets/di3-copy.png";
 // -- CONFIGURATION --
 
 // Reduced row counts to ensure a safety margin at the bottom of the page.
-// This prevents rows from being cut in half or dropped between pages.
 const ROWS_PORTRAIT = 36;   // Safe limit for A4 Portrait
 const ROWS_LANDSCAPE = 24;  // Safe limit for A4 Landscape
 
@@ -43,7 +42,7 @@ export default function PrintOptionsModal({
     
     // -- Loading & Toast State --
     const [isGenerating, setIsGenerating] = useState(false);
-    const [loadingAction, setLoadingAction] = useState(''); // 'download' or 'print'
+    const [loadingAction, setLoadingAction] = useState(''); // 'download', 'print', or 'excel'
     const [progress, setProgress] = useState(0);
     const [currentProcessingPage, setCurrentProcessingPage] = useState(0);
     const [toast, setToast] = useState(null); 
@@ -116,8 +115,7 @@ export default function PrintOptionsModal({
 
     // --- DYNAMIC ROWS CALCULATION ---
     const rowsPerPage = useMemo(() => {
-        // Use the same safe settings for both Print and Download to avoid layout discrepancies
-        return isLandscape ? ROWS_LANDSCAPE : ROWS_PORTRAIT; // 20 or 30
+        return isLandscape ? ROWS_LANDSCAPE : ROWS_PORTRAIT; 
     }, [isLandscape]);
 
     // -- Filter Logic --
@@ -140,6 +138,132 @@ export default function PrintOptionsModal({
         return chunks;
     }, [filteredData, rowsPerPage]);
 
+    // -- EXPORT TO EXCEL (PRO STYLING) --
+    const handleExportExcel = () => {
+        setLoadingAction('excel');
+        setIsGenerating(true);
+
+        setTimeout(() => {
+            try {
+                // 1. Prepare Headers & Data
+                const headers = [
+                    ...activeDataColumns.map(col => col.label),
+                    ...customColumns.map(col => col.label)
+                ];
+                
+                const totalColCount = headers.length;
+
+                // 2. Build HTML Table Rows with Inline CSS
+                let tableRows = "";
+                
+                filteredData.forEach((emp, index) => {
+                    // Zebra Striping Logic
+                    const bgColor = index % 2 === 0 ? '#ffffff' : '#f8fafc';
+                    
+                    let rowCells = "";
+                    
+                    // Data Columns
+                    activeDataColumns.forEach(col => {
+                        let cellValue = col.key === 'index' ? index + 1 : (emp[col.key] || '');
+                        
+                        rowCells += `
+                            <td style="
+                                background-color: ${bgColor}; 
+                                padding: 12px; 
+                                border: 1px solid #cbd5e1; 
+                                text-align: center; 
+                                vertical-align: middle; 
+                                font-size: 11pt;
+                                color: #334155;
+                            ">
+                                ${cellValue}
+                            </td>`;
+                    });
+
+                    // Custom Columns (Empty for printing/checking)
+                    customColumns.forEach(() => {
+                        rowCells += `<td style="background-color: ${bgColor}; border: 1px solid #cbd5e1;"></td>`;
+                    });
+
+                    tableRows += `<tr>${rowCells}</tr>`;
+                });
+
+                // 3. Construct Full HTML Template with "Cool" Styles
+                const excelTemplate = `
+                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                    <head>
+                        <meta charset="UTF-8">
+                        <style>
+                            table { border-collapse: collapse; width: 100%; font-family: 'Calibri', 'Arial', sans-serif; }
+                            
+                            /* TITLE ROW STYLE */
+                            .title-row {
+                                background-color: #e0e7ff; /* Light Indigo */
+                                color: #312e81; /* Dark Indigo */
+                                font-size: 20pt;
+                                font-weight: bold;
+                                text-align: center;
+                                height: 80px;
+                                vertical-align: middle;
+                                border: 1px solid #cbd5e1;
+                            }
+
+                            /* HEADER STYLE - COOL & BOLD */
+                            th {
+                                background-color: #4338ca; /* Indigo 700 */
+                                color: #ffffff;
+                                font-weight: bold;
+                                font-size: 14pt;
+                                height: 50px;
+                                border: 1px solid #312e81;
+                                vertical-align: middle;
+                                text-align: center;
+                                text-transform: uppercase;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <table>
+                            <tr>
+                                <td colspan="${totalColCount}" class="title-row">
+                                    ${reportTitle.toUpperCase()} REPORT
+                                </td>
+                            </tr>
+                            
+                            <thead>
+                                <tr>
+                                    ${headers.map(h => `<th>${h}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </body>
+                    </html>
+                `;
+
+                // 4. Create Blob and Download
+                const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel' });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `${reportTitle.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                setToast({ type: 'success', message: 'Excel Exported Successfully!' });
+            } catch (error) {
+                console.error("Excel Export Error:", error);
+                setToast({ type: 'error', message: 'Failed to export Excel.' });
+            } finally {
+                setIsGenerating(false);
+                setLoadingAction('');
+            }
+        }, 1000); // Slight delay for UX
+    };
+
     // -- GENERATE PDF (Download or Print) --
     const handleGeneratePDF = async (action = 'download') => {
         setIsGenerating(true);
@@ -147,7 +271,6 @@ export default function PrintOptionsModal({
         setProgress(0);
         setCurrentProcessingPage(0);
         
-        // Wait for UI to update row counts
         await new Promise(resolve => setTimeout(resolve, 800));
 
         try {
@@ -162,17 +285,15 @@ export default function PrintOptionsModal({
             const totalPages = pageElements.length;
             const capturedImages = [];
 
-            // 1. Capture All Pages
             for (let i = 0; i < totalPages; i++) {
                 setCurrentProcessingPage(i + 1);
                 
                 const page = pageElements[i];
-                // Determine Dimensions based on orientation state
                 const captureWidth = isLandscape ? 1555 : 1100;
                 const captureHeight = isLandscape ? 1100 : 1555;
 
                 const canvas = await html2canvas(page, {
-                    scale: 2, // Higher scale for clarity
+                    scale: 2,
                     useCORS: true,
                     logging: false,
                     windowWidth: captureWidth,
@@ -189,9 +310,7 @@ export default function PrintOptionsModal({
                 setProgress(percent);
             }
 
-            // 2. Handle Action
             if (action === 'download') {
-                // --- DOWNLOAD LOGIC (Use jsPDF) ---
                 const orientation = isLandscape ? 'landscape' : 'portrait';
                 const doc = new jsPDF({
                     orientation: orientation,
@@ -213,7 +332,6 @@ export default function PrintOptionsModal({
                 setLoadingAction('');
 
             } else if (action === 'print') {
-                // --- PRINT LOGIC (Use Direct HTML/CSS via Iframe) ---
                 const iframe = document.createElement('iframe');
                 iframe.style.position = 'fixed';
                 iframe.style.width = '0px';
@@ -238,13 +356,12 @@ export default function PrintOptionsModal({
                                     margin: 0; 
                                     padding: 0; 
                                 }
-                                /* Ensure image fits exactly one page and breaks after */
                                 img { 
                                     width: 100%; 
-                                    height: 100vh; /* Force full viewport height */
-                                    object-fit: contain; /* Prevent distortion */
+                                    height: 100vh;
+                                    object-fit: contain;
                                     display: block; 
-                                    page-break-after: always; /* Crucial for multi-page */
+                                    page-break-after: always;
                                 }
                             </style>
                         </head>
@@ -263,7 +380,6 @@ export default function PrintOptionsModal({
                     setTimeout(function() {
                         iframe.contentWindow.focus();
                         iframe.contentWindow.print();
-                        // Clean up iframe after a delay to ensure print dialog caught it
                         setTimeout(() => document.body.removeChild(iframe), 2000);
                     }, 500); 
                 };
@@ -302,22 +418,30 @@ export default function PrintOptionsModal({
                         <div className="relative mb-6">
                             <div className="h-20 w-20 border-4 border-slate-600 rounded-full mx-auto"></div>
                             <div className="h-20 w-20 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto absolute top-0 left-0 right-0 animate-spin"></div>
-                            <div className="absolute inset-0 flex items-center justify-center font-bold text-white text-lg">
-                                {progress}%
-                            </div>
+                            {loadingAction !== 'excel' && (
+                                <div className="absolute inset-0 flex items-center justify-center font-bold text-white text-lg">
+                                    {progress}%
+                                </div>
+                            )}
                         </div>
                         
                         <h3 className="text-xl font-bold text-white mb-2">
-                            {loadingAction === 'print' ? 'Preparing to Print...' : 'Generating PDF...'}
+                            {loadingAction === 'print' ? 'Preparing to Print...' : 
+                             loadingAction === 'excel' ? 'Exporting Excel...' : 
+                             'Generating PDF...'}
                         </h3>
-                        <p className="text-slate-400 text-sm mb-6">Processing page {currentProcessingPage} of {pages.length}</p>
+                        <p className="text-slate-400 text-sm mb-6">
+                            {loadingAction === 'excel' ? 'Please wait...' : `Processing page ${currentProcessingPage} of ${pages.length}`}
+                        </p>
                         
-                        <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
-                            <div 
-                                className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out" 
-                                style={{ width: `${progress}%` }}
-                            ></div>
-                        </div>
+                        {loadingAction !== 'excel' && (
+                            <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
+                                <div 
+                                    className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out" 
+                                    style={{ width: `${progress}%` }}
+                                ></div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -492,13 +616,13 @@ export default function PrintOptionsModal({
                     </div>
 
                     {/* Footer - Responsive Buttons */}
-                    <div className="px-6 py-5 border-t border-slate-100 bg-white flex justify-between items-center">
+                    <div className="px-6 py-5 border-t border-slate-100 bg-white flex flex-wrap justify-between items-center gap-4">
                          <div className="text-xs text-slate-400 font-medium hidden md:block">
                             Paper Size: <span className="text-slate-700 font-bold">A4</span>
                          </div>
                         
-                        <div className="flex gap-3 w-full md:w-auto justify-between md:justify-end">
-                            {/* CANCEL BUTTON - HIDDEN ON MOBILE (hidden md:flex) */}
+                        <div className="flex gap-3 w-full md:w-auto justify-between md:justify-end flex-1">
+                            {/* CANCEL BUTTON - HIDDEN ON MOBILE */}
                             <button 
                                 onClick={onClose} 
                                 disabled={isGenerating} 
@@ -507,28 +631,39 @@ export default function PrintOptionsModal({
                                 <span>Cancel</span>
                             </button>
 
-                            <div className="flex gap-3 w-full md:w-auto justify-end">
+                            <div className="flex gap-2 md:gap-3 w-full md:w-auto justify-end">
+                                {/* EXCEL BUTTON */}
+                                <button 
+                                    onClick={handleExportExcel} 
+                                    disabled={filteredData.length === 0 || isGenerating} 
+                                    className="p-3 md:px-5 md:py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-xl font-bold shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
+                                    title="Export Excel"
+                                >
+                                    {isGenerating && loadingAction === 'excel' ? <Loader2Icon className="h-5 w-5 animate-spin" /> : <FileSpreadsheetIcon className="h-5 w-5" />}
+                                    <span className="hidden md:inline">Excel</span>
+                                </button>
+
                                 {/* PRINT BUTTON */}
                                 <button 
                                     onClick={() => handleGeneratePDF('print')} 
                                     disabled={filteredData.length === 0 || isGenerating} 
-                                    className="p-3 md:px-6 md:py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
+                                    className="p-3 md:px-5 md:py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
                                     title="Print PDF"
                                 >
                                     {isGenerating && loadingAction === 'print' ? <Loader2Icon className="h-5 w-5 animate-spin" /> : <PrinterIcon className="h-5 w-5" />}
-                                    <span className="hidden md:inline">Print PDF</span>
+                                    <span className="hidden md:inline">Print</span>
                                 </button>
 
                                 {/* DOWNLOAD BUTTON */}
                                 <button 
                                     onClick={() => handleGeneratePDF('download')} 
                                     disabled={filteredData.length === 0 || isGenerating} 
-                                    className="p-3 md:px-8 md:py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:shadow-indigo-200 flex items-center justify-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
+                                    className="p-3 md:px-6 md:py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:shadow-indigo-200 flex items-center justify-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
                                     title="Download PDF"
                                 >
                                     {isGenerating && loadingAction === 'download' ? <Loader2Icon className="h-5 w-5 animate-spin" /> : <DownloadIcon className="h-5 w-5" />}
                                     <span className="hidden md:inline">
-                                        {isGenerating && loadingAction === 'download' ? 'Processing...' : 'Download PDF'}
+                                        {isGenerating && loadingAction === 'download' ? 'Processing...' : 'Download'}
                                     </span>
                                 </button>
                             </div>
@@ -540,7 +675,6 @@ export default function PrintOptionsModal({
             {/* --- HIDDEN PRINT AREA --- */}
             <div style={{ position: 'absolute', top: 0, left: '-9999px', width: isLandscape ? '1555px' : '1100px' }}>
                 <div id="pdf-content-area" style={{ width: '100%', backgroundColor: 'white' }}>
-                    
                     <style>{`
                         @import url('https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');
                         
@@ -552,6 +686,18 @@ export default function PrintOptionsModal({
                             position: relative;
                             box-sizing: border-box;
                             overflow: hidden;
+                        }
+
+                        /* FORCE LANDSCAPE PRINT IF COLUMNS > 8 */
+                        @media print {
+                            @page {
+                                size: ${isLandscape ? 'landscape' : 'portrait'};
+                                margin: 0;
+                            }
+                            body {
+                                margin: 0;
+                                -webkit-print-color-adjust: exact;
+                            }
                         }
 
                         .pdf-wrapper { font-family: 'Inter', 'Battambang', sans-serif; color: #0f172a; height: 100%; }
@@ -586,8 +732,8 @@ export default function PrintOptionsModal({
                             vertical-align: middle;
                             font-size: 13px;
                             border: 1px solid #e2e8f0; 
-                            text-align: center; /* Default center for text */
-                            height: 100%; /* Important for flex child */
+                            text-align: center; 
+                            height: 100%; 
                         }
 
                         .custom-cell-center {
@@ -596,7 +742,7 @@ export default function PrintOptionsModal({
                             align-items: center;
                             width: 100%;
                             height: 100%;
-                            min-height: 24px; /* Ensure visual height if empty */
+                            min-height: 24px; 
                         }
                         
                         tr:nth-child(even) { background-color: #f8fafc; }
@@ -605,7 +751,7 @@ export default function PrintOptionsModal({
                             width: 18px; height: 18px; 
                             border: 2px solid #94a3b8; 
                             border-radius: 4px; 
-                            display: block; /* changed to block for flex container */
+                            display: block; 
                         }
                         
                         .footer-text {
