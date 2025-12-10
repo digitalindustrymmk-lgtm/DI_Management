@@ -74,6 +74,9 @@ const EmployeeListView = ({
     const scrollLeft = useRef(0);
 
     const onMouseDown = (e) => { 
+        // Only drag if we are NOT clicking on an input field or select
+        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
         isDragging.current = true; 
         if(tableContainerRef.current) { 
             startX.current = e.pageX - tableContainerRef.current.offsetLeft; 
@@ -215,6 +218,70 @@ const EmployeeListView = ({
     const currentItems = sortedEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
     const totalPages = Math.ceil(sortedEmployees.length / itemsPerPage);
 
+    // --- GRID NAVIGATION LOGIC ---
+    // Define the order of columns as they appear in the table
+    // This MUST match the id format in EmployeeRow: `cell-{index}-{key}`
+    const COLUMN_ORDER = [
+        'name', 'latinName', 'gender', 'studentId', 'skill', 
+        'group', 'class', 'section', 'position', 'academicYear', 
+        'dob', 'pob', 'telegram',
+        'schedule-mon', 'schedule-tue', 'schedule-wed', 'schedule-thu', 'schedule-fri', 'schedule-sat', 'schedule-sun'
+    ];
+
+    const handleGridNavigation = (e, rowIndex, colKey) => {
+        // Updated to include 'Enter'
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) return;
+
+        const input = e.target;
+        
+        // Smart Navigation for Left/Right: Only move if cursor is at edge
+        if (e.key === 'ArrowLeft' && input.selectionStart > 0 && input.tagName === 'INPUT') return;
+        if (e.key === 'ArrowRight' && input.selectionEnd < input.value.length && input.tagName === 'INPUT') return;
+
+        // Prevent Default (except possibly inside text inputs where we handled above, but generally safe to prevent for navigation)
+        // For 'Enter', we definitely want to prevent default form submission/newline
+        if (e.key !== 'Enter') e.preventDefault(); 
+        
+        // Note: For Enter, UI.jsx handles blurring/saving first. 
+        // We rely on the event bubbling up or being called manually.
+        
+        let nextRow = rowIndex;
+        let nextColIndex = COLUMN_ORDER.indexOf(colKey);
+
+        if (nextColIndex === -1) return; 
+
+        if (e.key === 'ArrowUp') {
+            nextRow = rowIndex - 1;
+        } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+            // ENTER behaves like Arrow Down
+            nextRow = rowIndex + 1;
+        } else if (e.key === 'ArrowLeft') {
+            nextColIndex = nextColIndex - 1;
+        } else if (e.key === 'ArrowRight') {
+            nextColIndex = nextColIndex + 1;
+        }
+
+        // Boundary Checks
+        if (nextRow < 0 || nextRow >= currentItems.length) return; // Top/Bottom edge
+        if (nextColIndex < 0 || nextColIndex >= COLUMN_ORDER.length) return; // Left/Right edge
+
+        const nextColKey = COLUMN_ORDER[nextColIndex];
+        
+        // Find next input
+        // ID Format: "cell-{rowIndex}-{columnKey}"
+        const targetId = `cell-${nextRow}-${nextColKey}`;
+        
+        // We use setTimeout to allow the current cell to process its blur/save event first
+        setTimeout(() => {
+            const targetInput = document.getElementById(targetId);
+            if (targetInput) {
+                targetInput.focus();
+                // Optional: Select text in next cell
+                if (targetInput.select) targetInput.select();
+            }
+        }, 0);
+    };
+
     return (
         <>
             <SortOptionsModal 
@@ -268,7 +335,7 @@ const EmployeeListView = ({
                 </div>
             )}
 
-            {/* --- MOBILE SEARCH OVERLAY --- */}
+            {/* --- MOBILE SEARCH OVERLAY (Visible < 1024px when toggled) --- */}
             <div className={`lg:hidden fixed inset-0 z-[100] bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMobileSearch ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileSearch(false)}>
                 <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-5 shadow-2xl transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : 'translate-y-full'}`} onClick={e => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-4">
@@ -551,10 +618,11 @@ const EmployeeListView = ({
                                                     onEdit={() => onEdit(emp)} 
                                                     onDelete={() => onDelete(emp.id)} 
                                                     onInlineUpdate={onInlineUpdate} 
-                                                    index={idx} 
+                                                    index={idx} // Passing Row Index
                                                     settings={settings}
                                                     isSelected={selectedIds.has(emp.id)} 
                                                     onToggleSelect={toggleSelect} 
+                                                    onNavigate={handleGridNavigation} // PASSING THE NAVIGATOR FUNCTION
                                                 />
                                             )}
                                         </tbody>

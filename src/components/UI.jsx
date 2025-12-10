@@ -15,7 +15,7 @@ export const ToastContainer = ({ toasts, removeToast }) => (
 );
 
 // --- FIXED EDITABLE CELL ---
-export const EditableCell = memo(({ value, onSave, className, options }) => {
+export const EditableCell = memo(({ value, onSave, className, options, ...props }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [tempValue, setTempValue] = useState(value);
     const inputRef = useRef(null);
@@ -45,6 +45,22 @@ export const EditableCell = memo(({ value, onSave, className, options }) => {
         onSave(newValue); // Save IMMEDIATELLY using the event value, not state
         setIsEditing(false); // Close edit mode immediately
     };
+    
+    // MERGED KEYDOWN HANDLER
+    const handleKeyDown = (e) => {
+        // Internal Logic (Save/Cancel)
+        if (e.key === 'Enter') {
+            inputRef.current.blur(); 
+        } else if (e.key === 'Escape') {
+            setTempValue(value); 
+            setIsEditing(false);
+        }
+
+        // External Navigation Logic (passed via props)
+        if (props.onKeyDown) {
+            props.onKeyDown(e);
+        }
+    };
 
     if (isEditing) {
         // --- DROPDOWN MODE ---
@@ -53,12 +69,13 @@ export const EditableCell = memo(({ value, onSave, className, options }) => {
                 <select
                     ref={inputRef}
                     value={tempValue}
-                    onChange={handleSelectChange} // Use the new handler
-                    onBlur={() => setIsEditing(false)} // Just close on blur, don't save (saving happens on change)
+                    onChange={handleSelectChange} 
+                    onBlur={() => setIsEditing(false)} 
                     className={`w-full min-w-[100px] p-1.5 border-2 border-indigo-400 rounded-lg bg-white text-slate-900 outline-none text-sm shadow-lg animate-in fade-in zoom-in duration-200 ${className}`}
+                    onKeyDown={handleKeyDown} // Use merged handler
+                    {...props} // Pass ID and other props
                 >
                     <option value="" disabled>Select...</option>
-                    {/* Ensure current value is shown even if not in options list initially */}
                     {!options.includes(value) && value && <option value={value}>{value}</option>}
                     {options.map((opt, idx) => (
                         <option key={`${opt}-${idx}`} value={opt}>{opt}</option>
@@ -74,15 +91,9 @@ export const EditableCell = memo(({ value, onSave, className, options }) => {
                 value={tempValue} 
                 onChange={(e) => setTempValue(e.target.value)} 
                 onBlur={handleBlur} 
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                        inputRef.current.blur(); // Trigger blur to save
-                    } else if (e.key === 'Escape') {
-                        setTempValue(value); // Revert
-                        setIsEditing(false);
-                    }
-                }} 
+                onKeyDown={handleKeyDown} // Use merged handler
                 className={`w-full min-w-[80px] p-1.5 border-2 border-indigo-400 rounded-lg bg-white text-slate-900 outline-none text-sm shadow-lg animate-in fade-in zoom-in duration-200 ${className}`} 
+                {...props} // Pass ID and other props
             />
         );
     }
@@ -90,14 +101,31 @@ export const EditableCell = memo(({ value, onSave, className, options }) => {
     // --- VIEW MODE ---
     return (
         <div 
+            // Important: We attach the ID here too so we can find the cell even if not editing yet
+            // But usually we want to find the container to trigger edit mode? 
+            // Actually, the navigation logic tries to focus the input. 
+            // If we are navigating, we usually want to trigger edit mode immediately?
+            // For now, let's keep it simple: Click to edit.
+            // If you want "Navigate to cell -> automatically enter edit mode", we need more complex logic.
+            // BUT: The current logic finds "cell-{row}-{col}" which is likely assigned to this DIV when not editing?
+            // Wait, the ID is passed to EditableCell. 
+            // If isEditing is false, we render this DIV.
+            // We should put the ID here so document.getElementById works.
+            id={props.id}
+            tabIndex={0} // Make it focusable
+            onFocus={() => setIsEditing(true)} // Enter edit mode on focus
+            
             onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} 
-            className={`cursor-pointer group hover:bg-indigo-50 hover:text-indigo-700 px-2 py-1.5 -mx-2 rounded-lg transition-all border border-transparent hover:border-indigo-100 min-h-[32px] flex items-center relative ${className}`}
+            className={`cursor-pointer group hover:bg-indigo-50 hover:text-indigo-700 px-2 py-1.5 -mx-2 rounded-lg transition-all border border-transparent hover:border-indigo-100 min-h-[32px] flex items-center relative outline-none focus:ring-2 focus:ring-indigo-400 ${className}`}
             title="Click to edit"
+            onKeyDown={(e) => {
+                if(e.key === 'Enter') setIsEditing(true);
+                if(props.onKeyDown) props.onKeyDown(e);
+            }}
         >
             <span className="truncate w-full">
                 {value || <span className="text-slate-300 italic text-xs">Empty</span>}
             </span>
-            {/* Visual indicator on hover */}
             <span className="absolute right-1 opacity-0 group-hover:opacity-40 text-[10px] text-indigo-400">▼</span>
         </div>
     );
