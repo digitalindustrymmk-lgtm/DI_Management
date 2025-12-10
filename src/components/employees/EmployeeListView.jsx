@@ -79,7 +79,7 @@ const EmployeeListView = ({
             startX.current = e.pageX - tableContainerRef.current.offsetLeft; 
             scrollLeft.current = tableContainerRef.current.scrollLeft; 
             tableContainerRef.current.classList.add('cursor-grabbing'); 
-            tableContainerRef.current.classList.add('select-none'); // Prevent text selection while dragging
+            tableContainerRef.current.classList.add('select-none'); 
         } 
     };
     
@@ -268,7 +268,7 @@ const EmployeeListView = ({
                 </div>
             )}
 
-            {/* --- MOBILE SEARCH OVERLAY (Visible < 1024px when toggled) --- */}
+            {/* --- MOBILE SEARCH OVERLAY --- */}
             <div className={`lg:hidden fixed inset-0 z-[100] bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMobileSearch ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileSearch(false)}>
                 <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-5 shadow-2xl transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : 'translate-y-full'}`} onClick={e => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-4">
@@ -335,6 +335,7 @@ const EmployeeListView = ({
                     
                     <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
                         
+                        {/* SEARCH & FILTER TOGGLE */}
                         <div className="flex gap-3 items-center w-full md:w-auto flex-1">
                             <div className="relative w-full md:w-72 lg:w-96 group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -367,6 +368,7 @@ const EmployeeListView = ({
                             </button>
                         </div>
 
+                        {/* DESKTOP RIGHT ACTIONS */}
                         <div className="flex items-center gap-3">
                             {!isRecycleBin && (
                                 <>
@@ -385,7 +387,18 @@ const EmployeeListView = ({
                                         <div className="bg-white/50 p-1.5 rounded-xl flex items-center ring-1 ring-slate-200">
                                             <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGridIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="h-5 w-5" /></button>
+                                            
                                             <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                                            
+                                            {/* NEW SELECT ALL BUTTON (Visible in Toolbar) */}
+                                            <button 
+                                                onClick={toggleSelectAll} 
+                                                className="p-2.5 rounded-lg text-slate-400 hover:text-indigo-600 transition-all hover:bg-indigo-50" 
+                                                title="Select All"
+                                            >
+                                                <CheckSquareIcon className="h-5 w-5" />
+                                            </button>
+
                                             <button onClick={() => setIsPrintModalOpen(true)} className="p-2.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-all" title="Export PDF">
                                                 <PrinterIcon className="h-5 w-5" />
                                             </button>
