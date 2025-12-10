@@ -3,15 +3,18 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { 
     XIcon, PrinterIcon, Loader2Icon, PlusIcon, Trash2Icon, 
-    CheckIcon, CheckCircleIcon, AlertCircleIcon 
+    CheckIcon, AlertCircleIcon, DownloadIcon 
 } from '../Icons'; 
 
 // --- IMPORT YOUR LOGO HERE ---
 import logoImage from "../../assets/di3-copy.png";
 
 // -- CONFIGURATION --
-const ROWS_PORTRAIT = 36;
-const ROWS_LANDSCAPE = 24;
+
+// Reduced row counts to ensure a safety margin at the bottom of the page.
+// This prevents rows from being cut in half or dropped between pages.
+const ROWS_PORTRAIT = 36;   // Safe limit for A4 Portrait
+const ROWS_LANDSCAPE = 24;  // Safe limit for A4 Landscape
 
 const DEFAULT_COLUMNS = [
     { key: 'index', label: 'NO.' },
@@ -26,7 +29,6 @@ const DEFAULT_COLUMNS = [
     { key: 'class', label: 'ថ្នាក់' },
     { key: 'academicYear', label: 'ឆ្នាំសិក្សា' },
     { key: 'telegram', label: 'Telegram' },
-    { key: 'attendance', label: 'ATTENDANCE' },
 ];
 
 export default function PrintOptionsModal({
@@ -41,6 +43,7 @@ export default function PrintOptionsModal({
     
     // -- Loading & Toast State --
     const [isGenerating, setIsGenerating] = useState(false);
+    const [loadingAction, setLoadingAction] = useState(''); // 'download' or 'print'
     const [progress, setProgress] = useState(0);
     const [currentProcessingPage, setCurrentProcessingPage] = useState(0);
     const [toast, setToast] = useState(null); 
@@ -48,7 +51,7 @@ export default function PrintOptionsModal({
     const [dataColumns, setDataColumns] = useState(
         DEFAULT_COLUMNS.map(c => ({
             ...c,
-            selected: ['index', 'studentId', 'name', 'gender', 'position', 'group', 'attendance'].includes(c.key)
+            selected: ['index', 'studentId', 'name', 'gender', 'position', 'group'].includes(c.key)
         }))
     );
 
@@ -110,7 +113,12 @@ export default function PrintOptionsModal({
     const activeDataColumns = dataColumns.filter(c => c.selected);
     const totalColumns = activeDataColumns.length + customColumns.length;
     const isLandscape = totalColumns > 8;
-    const rowsPerPage = isLandscape ? ROWS_LANDSCAPE : ROWS_PORTRAIT;
+
+    // --- DYNAMIC ROWS CALCULATION ---
+    const rowsPerPage = useMemo(() => {
+        // Use the same safe settings for both Print and Download to avoid layout discrepancies
+        return isLandscape ? ROWS_LANDSCAPE : ROWS_PORTRAIT; // 20 or 30
+    }, [isLandscape]);
 
     // -- Filter Logic --
     const filteredData = useMemo(() => {
@@ -132,40 +140,39 @@ export default function PrintOptionsModal({
         return chunks;
     }, [filteredData, rowsPerPage]);
 
-    // -- DOWNLOAD LOGIC --
-    const handleDownloadPDF = async () => {
+    // -- GENERATE PDF (Download or Print) --
+    const handleGeneratePDF = async (action = 'download') => {
         setIsGenerating(true);
+        setLoadingAction(action);
         setProgress(0);
         setCurrentProcessingPage(0);
         
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait for UI to update row counts
+        await new Promise(resolve => setTimeout(resolve, 800));
 
         try {
-            const orientation = isLandscape ? 'landscape' : 'portrait';
-            const doc = new jsPDF({
-                orientation: orientation,
-                unit: 'mm',
-                format: 'a4'
-            });
-
             const pageElements = document.querySelectorAll('.printable-page');
             if (pageElements.length === 0) {
                 setToast({ type: 'error', message: 'No pages found to print.' });
                 setIsGenerating(false);
+                setLoadingAction('');
                 return;
             }
 
             const totalPages = pageElements.length;
+            const capturedImages = [];
 
+            // 1. Capture All Pages
             for (let i = 0; i < totalPages; i++) {
                 setCurrentProcessingPage(i + 1);
                 
                 const page = pageElements[i];
+                // Determine Dimensions based on orientation state
                 const captureWidth = isLandscape ? 1555 : 1100;
                 const captureHeight = isLandscape ? 1100 : 1555;
 
                 const canvas = await html2canvas(page, {
-                    scale: 2,
+                    scale: 2, // Higher scale for clarity
                     useCORS: true,
                     logging: false,
                     windowWidth: captureWidth,
@@ -176,27 +183,97 @@ export default function PrintOptionsModal({
                 });
 
                 const imgData = canvas.toDataURL('image/jpeg', 0.95);
-                const pdfWidth = isLandscape ? 297 : 210;
-                const pdfHeight = isLandscape ? 210 : 297;
-
-                if (i > 0) doc.addPage();
-                doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                capturedImages.push(imgData);
 
                 const percent = Math.round(((i + 1) / totalPages) * 100);
                 setProgress(percent);
             }
 
-            doc.save(`${reportTitle.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
-            setToast({ type: 'success', message: 'PDF Downloaded Successfully!' });
-            
-            setTimeout(() => {
+            // 2. Handle Action
+            if (action === 'download') {
+                // --- DOWNLOAD LOGIC (Use jsPDF) ---
+                const orientation = isLandscape ? 'landscape' : 'portrait';
+                const doc = new jsPDF({
+                    orientation: orientation,
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const pdfWidth = isLandscape ? 297 : 210;
+                const pdfHeight = isLandscape ? 210 : 297;
+
+                capturedImages.forEach((img, index) => {
+                    if (index > 0) doc.addPage();
+                    doc.addImage(img, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                });
+
+                doc.save(`${reportTitle.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
+                setToast({ type: 'success', message: 'PDF Downloaded Successfully!' });
                 setIsGenerating(false);
-            }, 800);
+                setLoadingAction('');
+
+            } else if (action === 'print') {
+                // --- PRINT LOGIC (Use Direct HTML/CSS via Iframe) ---
+                const iframe = document.createElement('iframe');
+                iframe.style.position = 'fixed';
+                iframe.style.width = '0px';
+                iframe.style.height = '0px';
+                iframe.style.border = 'none';
+                iframe.style.zIndex = '-1';
+                document.body.appendChild(iframe);
+
+                const doc = iframe.contentWindow.document;
+                const cssOrientation = isLandscape ? 'landscape' : 'portrait';
+                
+                doc.write(`
+                    <html>
+                        <head>
+                            <title>Print Report</title>
+                            <style>
+                                @page { 
+                                    size: ${cssOrientation}; 
+                                    margin: 0; 
+                                }
+                                body { 
+                                    margin: 0; 
+                                    padding: 0; 
+                                }
+                                /* Ensure image fits exactly one page and breaks after */
+                                img { 
+                                    width: 100%; 
+                                    height: 100vh; /* Force full viewport height */
+                                    object-fit: contain; /* Prevent distortion */
+                                    display: block; 
+                                    page-break-after: always; /* Crucial for multi-page */
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            ${capturedImages.map(img => `<img src="${img}" />`).join('')}
+                        </body>
+                    </html>
+                `);
+                doc.close();
+
+                iframe.onload = function() {
+                    setToast({ type: 'success', message: 'Print Dialog Opened' });
+                    setIsGenerating(false);
+                    setLoadingAction('');
+                    
+                    setTimeout(function() {
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                        // Clean up iframe after a delay to ensure print dialog caught it
+                        setTimeout(() => document.body.removeChild(iframe), 2000);
+                    }, 500); 
+                };
+            }
 
         } catch (err) {
             console.error("PDF Generation Error:", err);
             setToast({ type: 'error', message: 'Failed to generate PDF.' });
             setIsGenerating(false);
+            setLoadingAction('');
         }
     };
 
@@ -230,7 +307,9 @@ export default function PrintOptionsModal({
                             </div>
                         </div>
                         
-                        <h3 className="text-xl font-bold text-white mb-2">Generating PDF...</h3>
+                        <h3 className="text-xl font-bold text-white mb-2">
+                            {loadingAction === 'print' ? 'Preparing to Print...' : 'Generating PDF...'}
+                        </h3>
                         <p className="text-slate-400 text-sm mb-6">Processing page {currentProcessingPage} of {pages.length}</p>
                         
                         <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
@@ -412,32 +491,53 @@ export default function PrintOptionsModal({
                         </div>
                     </div>
 
-                    {/* Footer */}
-                    <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-between items-center">
-                         <div className="text-xs text-slate-400 font-medium">
+                    {/* Footer - Responsive Buttons */}
+                    <div className="px-6 py-5 border-t border-slate-100 bg-white flex justify-between items-center">
+                         <div className="text-xs text-slate-400 font-medium hidden md:block">
                             Paper Size: <span className="text-slate-700 font-bold">A4</span>
                          </div>
-                        <div className="flex gap-3">
-                            <button onClick={onClose} disabled={isGenerating} className="px-6 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 text-sm transition-colors">
-                                Cancel
-                            </button>
+                        
+                        <div className="flex gap-3 w-full md:w-auto justify-between md:justify-end">
+                            {/* CANCEL BUTTON - HIDDEN ON MOBILE (hidden md:flex) */}
                             <button 
-                                onClick={handleDownloadPDF} 
-                                disabled={filteredData.length === 0 || isGenerating} 
-                                className="px-4 md:px-8 py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:shadow-indigo-200 flex items-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
+                                onClick={onClose} 
+                                disabled={isGenerating} 
+                                className="hidden md:flex px-6 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 text-sm transition-colors items-center justify-center bg-transparent"
                             >
-                                {isGenerating ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <PrinterIcon className="h-4 w-4" />}
-                                <span className="hidden md:inline">
-                                    {isGenerating ? 'Processing...' : 'Download PDF'}
-                                </span>
+                                <span>Cancel</span>
                             </button>
+
+                            <div className="flex gap-3 w-full md:w-auto justify-end">
+                                {/* PRINT BUTTON */}
+                                <button 
+                                    onClick={() => handleGeneratePDF('print')} 
+                                    disabled={filteredData.length === 0 || isGenerating} 
+                                    className="p-3 md:px-6 md:py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
+                                    title="Print PDF"
+                                >
+                                    {isGenerating && loadingAction === 'print' ? <Loader2Icon className="h-5 w-5 animate-spin" /> : <PrinterIcon className="h-5 w-5" />}
+                                    <span className="hidden md:inline">Print PDF</span>
+                                </button>
+
+                                {/* DOWNLOAD BUTTON */}
+                                <button 
+                                    onClick={() => handleGeneratePDF('download')} 
+                                    disabled={filteredData.length === 0 || isGenerating} 
+                                    className="p-3 md:px-8 md:py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:shadow-indigo-200 flex items-center justify-center gap-2 text-sm transform active:scale-95 transition-all disabled:opacity-50 disabled:transform-none"
+                                    title="Download PDF"
+                                >
+                                    {isGenerating && loadingAction === 'download' ? <Loader2Icon className="h-5 w-5 animate-spin" /> : <DownloadIcon className="h-5 w-5" />}
+                                    <span className="hidden md:inline">
+                                        {isGenerating && loadingAction === 'download' ? 'Processing...' : 'Download PDF'}
+                                    </span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* --- HIDDEN PRINT AREA --- */}
-            {/* Logic for centering checkboxes is in the CSS below (.custom-cell-center) */}
             <div style={{ position: 'absolute', top: 0, left: '-9999px', width: isLandscape ? '1555px' : '1100px' }}>
                 <div id="pdf-content-area" style={{ width: '100%', backgroundColor: 'white' }}>
                     
