@@ -26,7 +26,6 @@ const DEFAULT_COLUMNS = [
     { key: 'telegram', label: 'Telegram' },
 ];
 
-// UPDATED: Only 'position' and 'section' are allowed to wrap text.
 const WRAP_COLUMNS = ['position', 'section'];
 
 export default function PrintOptionsModal({
@@ -35,7 +34,6 @@ export default function PrintOptionsModal({
     employees = []
 }) {
     // -- State --
-    const [reportTitle] = useState('Digital Industry');
     const [exportScope, setExportScope] = useState('all');
     const [scopeValue, setScopeValue] = useState('');
     
@@ -49,12 +47,24 @@ export default function PrintOptionsModal({
     const [dataColumns, setDataColumns] = useState(
         DEFAULT_COLUMNS.map(c => ({
             ...c,
-            // Default selected columns
             selected: ['index', 'studentId', 'name', 'gender', 'position', 'group'].includes(c.key)
         }))
     );
 
     const [customColumns, setCustomColumns] = useState([]);
+
+    // --- DYNAMIC REPORT TITLE LOGIC ---
+    const reportTitle = useMemo(() => {
+        const baseTitle = 'Digital Industry';
+        
+        if (exportScope === 'all' || !scopeValue) {
+            return baseTitle;
+        }
+
+        const formattedScope = exportScope.charAt(0).toUpperCase() + exportScope.slice(1);
+        return `${baseTitle} - ${formattedScope} (${scopeValue})`;
+    }, [exportScope, scopeValue]);
+
 
     // -- Toast Timer --
     useEffect(() => {
@@ -112,7 +122,6 @@ export default function PrintOptionsModal({
     const activeDataColumns = dataColumns.filter(c => c.selected);
     const totalColumns = activeDataColumns.length + customColumns.length;
     
-    // Logic: If columns > 8, force landscape
     const isLandscape = totalColumns > 8;
 
     // -- Filter Logic --
@@ -126,11 +135,9 @@ export default function PrintOptionsModal({
         });
     }, [employees, exportScope, scopeValue]);
 
-    // --- UPDATED: FIXED ROW COUNT PAGINATION ---
+    // --- ROW COUNT PAGINATION ---
     const pages = useMemo(() => {
         const chunks = [];
-        
-        // STRICT ROW LIMITS
         const ROWS_PER_PAGE = isLandscape ? 15 : 24;
 
         for (let i = 0; i < filteredData.length; i += ROWS_PER_PAGE) {
@@ -140,55 +147,126 @@ export default function PrintOptionsModal({
         return chunks;
     }, [filteredData, isLandscape]);
 
-    // -- EXPORT TO EXCEL --
+    // ---------------------------------------------------------
+    // -- EXCEL EXPORT (NO WRAP + PADDING) --
+    // ---------------------------------------------------------
     const handleExportExcel = () => {
         setLoadingAction('excel');
         setIsGenerating(true);
 
         setTimeout(() => {
             try {
+                // 1. Define Column Widths
+                const getColumnWidth = (key) => {
+                    switch(key) {
+                        case 'index': return 60;
+                        case 'studentId': return 100;
+                        case 'name': return 220;
+                        case 'latinName': return 200;
+                        case 'gender': return 80;
+                        case 'dob': return 120;
+                        case 'position': return 250;
+                        case 'telegram': return 150;
+                        case 'academicYear': return 120;
+                        default: return 150;
+                    }
+                };
+
+                // 2. Build <col> tags
+                let colGroupHTML = '<colgroup>';
+                activeDataColumns.forEach(col => {
+                    colGroupHTML += `<col width="${getColumnWidth(col.key)}">`;
+                });
+                customColumns.forEach(() => {
+                    colGroupHTML += `<col width="100">`; 
+                });
+                colGroupHTML += '</colgroup>';
+
+                // 3. Headers
                 const headers = [
                     ...activeDataColumns.map(col => col.label),
                     ...customColumns.map(col => col.label)
                 ];
                 const totalColCount = headers.length;
+
+                // 4. Build Table Rows
                 let tableRows = "";
                 
                 filteredData.forEach((emp, index) => {
-                    const bgColor = index % 2 === 0 ? '#ffffff' : '#f8fafc';
+                    const bgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
                     let rowCells = "";
+                    
                     activeDataColumns.forEach(col => {
                         let cellValue = col.key === 'index' ? index + 1 : (emp[col.key] || '');
                         
-                        // Check if this column allows wrapping
                         const isWrap = WRAP_COLUMNS.includes(col.key);
                         const wrapStyle = isWrap ? "white-space: normal; word-wrap: break-word;" : "white-space: nowrap;";
 
+                        // ROW CELL: Khmer OS Battambang
                         rowCells += `
-                            <td style="background-color: ${bgColor}; padding: 12px; border: 1px solid #cbd5e1; text-align: center; vertical-align: middle; font-size: 14pt; color: #334155; ${wrapStyle}">
+                            <td style="background-color: ${bgColor}; padding: 10px; border: 1px solid #000000; text-align: center; vertical-align: middle; font-size: 11pt; color: #000000; font-family: 'Khmer OS Battambang', 'Battambang', sans-serif; mso-number-format:'\@'; ${wrapStyle}">
                                 ${cellValue}
                             </td>`;
                     });
+
                     customColumns.forEach(() => {
-                        rowCells += `<td style="background-color: ${bgColor}; border: 1px solid #cbd5e1;"></td>`;
+                        rowCells += `<td style="background-color: ${bgColor}; border: 1px solid #000000;"></td>`;
                     });
-                    tableRows += `<tr>${rowCells}</tr>`;
+
+                    tableRows += `<tr style="height: 40px;">${rowCells}</tr>`;
                 });
 
+                // 5. Assemble HTML Template
                 const excelTemplate = `
                     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
                     <head>
                         <meta charset="UTF-8">
                         <style>
-                            table { border-collapse: collapse; width: 100%; font-family: 'Calibri', 'Arial', sans-serif; }
-                            .title-row { background-color: #e0e7ff; color: #312e81; font-size: 24pt; font-weight: bold; text-align: center; height: 90px; vertical-align: middle; border: 1px solid #cbd5e1; }
-                            th { background-color: #4338ca; color: #ffffff; font-weight: bold; font-size: 16pt; height: 60px; border: 1px solid #312e81; vertical-align: middle; text-align: center; text-transform: uppercase; }
+                            /* GLOBAL DEFAULT */
+                            body { font-family: 'Khmer OS Battambang', sans-serif; }
+                            table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+                            
+                            /* --- HEADER MATCHING IMAGE --- */
+                            th { 
+                                background-color: #FFFF00; /* YELLOW */
+                                color: #000000; /* BLACK TEXT */
+                                font-family: 'Khmer OS Muol Light', 'Khmer OS Muol', 'Moul', sans-serif; 
+                                font-weight: bold; 
+                                font-size: 12pt; 
+                                height: 50px; 
+                                border: 1px solid #000000; /* BLACK BORDER */
+                                vertical-align: middle; 
+                                text-align: center; 
+                                text-transform: uppercase; 
+                            }
+                            
+                            /* DATA ROW STYLE */
+                            td {
+                                font-family: 'Khmer OS Battambang', sans-serif;
+                            }
                         </style>
                     </head>
                     <body>
                         <table>
-                            <tr><td colspan="${totalColCount}" class="title-row">${reportTitle.toUpperCase()} REPORT</td></tr>
-                            <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                            ${colGroupHTML}
+                            
+                            <tr style="height: auto;">
+                                <td colspan="${totalColCount}" style="border: 1px solid #000000; background-color: #ffffff; vertical-align: middle; text-align: center; padding-top: 30px; padding-bottom: 30px;">
+                                    <div style="font-family: 'Khmer OS Muol Light', 'Khmer OS Muol', sans-serif; font-size: 24pt; font-weight: bold; color: #4338ca; white-space: nowrap;">
+                                        ${reportTitle.toUpperCase()}
+                                    </div>
+                                    <div style="font-family: 'Khmer OS Battambang', sans-serif; font-size: 12pt; color: #64748b; margin-top: 10px;">
+                                        Generated by HR PRO System
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <thead>
+                                <tr>
+                                    ${headers.map(h => `<th bgcolor="#FFFF00" style="background-color: #FFFF00; font-family: 'Khmer OS Muol Light', 'Khmer OS Muol', 'Moul', sans-serif;">${h}</th>`).join('')} 
+                                </tr>
+                            </thead>
+
                             <tbody>${tableRows}</tbody>
                         </table>
                     </body>
@@ -198,7 +276,7 @@ export default function PrintOptionsModal({
                 const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel' });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
-                link.download = `${reportTitle.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`;
+                link.download = `${reportTitle.replace(/[^\w\s\-\(\)]/g, '').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -214,7 +292,7 @@ export default function PrintOptionsModal({
         }, 1000);
     };
 
-    // -- GENERATE PDF (Download or Print) --
+    // -- GENERATE PDF/PRINT --
     const handleGeneratePDF = async (action = 'download') => {
         setIsGenerating(true);
         setLoadingAction('checking'); 
@@ -307,7 +385,7 @@ export default function PrintOptionsModal({
                     doc.addImage(img, 'JPEG', 0, 0, pdfWidth, pdfHeight);
                 });
 
-                doc.save(`${reportTitle.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
+                doc.save(`${reportTitle.replace(/[^\w\s\-\(\)]/g, '').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
                 setToast({ type: 'success', message: 'PDF Downloaded Successfully!' });
                 setIsGenerating(false);
                 setLoadingAction('');
@@ -495,7 +573,7 @@ export default function PrintOptionsModal({
                                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                             <div className="w-1 h-1 bg-teal-500 rounded-full"></div> Custom Columns
                                         </h3>
-                                        <button onClick={addCustomColumn} className="text-[10px] flex items-center gap-1 bg-teal-50 text-teal-600 px-3 py-1.5 rounded-lg font-bold hover:bg-teal-100 transition-colors border border-teal-100">
+                                        <button onClick={addCustomColumn} className="text-[10px] flex items-center gap-1 bg-teal-5 text-teal-600 px-3 py-1.5 rounded-lg font-bold hover:bg-teal-100 transition-colors border border-teal-100">
                                             <PlusIcon className="h-3 w-3" /> Add New
                                         </button>
                                     </div>
@@ -647,7 +725,7 @@ export default function PrintOptionsModal({
             <div style={{ position: 'absolute', top: 0, left: '-9999px', width: isLandscape ? '1555px' : '1100px' }}>
                 <div id="pdf-content-area" style={{ width: '100%', backgroundColor: 'white' }}>
                     <style>{`
-                        @import url('https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');
+                        @import url('https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Moul&family=Inter:wght@400;500;600;700&display=swap');
                         
                         .printable-page {
                             width: ${isLandscape ? '1555px' : '1100px'};
@@ -671,7 +749,7 @@ export default function PrintOptionsModal({
                         }
 
                         .pdf-wrapper { 
-                            font-family: 'Inter', 'Battambang', sans-serif; 
+                            font-family: 'Inter', 'Khmer OS Battambang', 'Battambang', sans-serif; 
                             color: #0f172a; 
                             height: 100%; 
                             display: flex; 
@@ -689,31 +767,34 @@ export default function PrintOptionsModal({
                         table { 
                             width: 100%; 
                             border-collapse: collapse; 
-                            border: 2px solid #cbd5e1; 
+                            border: 2px solid #000000; 
                             table-layout: auto; 
                             flex-shrink: 0;
                         }
                         
+                        /* *** HEADER COLUMNS = KHMER OS MUOL *** */
                         th {
-                            background-color: #f1f5f9; 
-                            color: #334155; 
+                            background-color: #FFFF00; /* YELLOW */
+                            color: #000000; /* BLACK */
                             font-weight: 800; 
                             text-transform: uppercase; 
                             padding: 12px 8px; 
                             text-align: center;
-                            font-size: 22px; 
-                            border: 1px solid #94a3b8; 
-                            white-space: nowrap; 
+                            font-size: 20px; 
+                            border: 1px solid #000000; /* BLACK BORDER */
+                            white-space: nowrap;
+                            font-family: 'Khmer OS Muol Light', 'Khmer OS Muol', 'Moul', sans-serif;
                         }
 
+                        /* *** ROWS = KHMER OS BATTAMBANG *** */
                         td {
                             padding: 10px 8px; 
                             vertical-align: middle;
                             font-size: 18px; 
-                            border: 1px solid #cbd5e1; 
+                            border: 1px solid #000000; /* BLACK BORDER */
                             text-align: center; 
+                            font-family: 'Khmer OS Battambang', 'Battambang', sans-serif;
                             
-                            /* DEFAULT TO NO WRAP */
                             white-space: nowrap;
                             overflow: hidden; 
                             text-overflow: ellipsis; 
@@ -733,7 +814,7 @@ export default function PrintOptionsModal({
 
                         .box-check {
                             width: 22px; height: 22px; 
-                            border: 2px solid #94a3b8; 
+                            border: 2px solid #000000; 
                             border-radius: 6px; 
                             display: block; 
                         }
@@ -751,7 +832,7 @@ export default function PrintOptionsModal({
                                     <div className="header-left">
                                         <img src={logoImage} alt="Logo" style={{ height: '70px', objectFit: 'contain' }} />
                                         <div>
-                                            <h1 style={{ fontSize: '34px', fontWeight: '800', textTransform: 'uppercase', margin: 0 }} className="font-battambang">
+                                            <h1 style={{ fontSize: '30px', fontWeight: '800', textTransform: 'uppercase', margin: 0, fontFamily: "'Khmer OS Muol Light', 'Khmer OS Muol', 'Moul', sans-serif" }}>
                                                 {reportTitle}
                                             </h1>
                                             <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 'bold' }}>Generated by HR PRO System</span>
@@ -767,7 +848,7 @@ export default function PrintOptionsModal({
                                     <thead>
                                         <tr>
                                             {activeDataColumns.map((col) => (
-                                                <th key={col.key} className="font-battambang">{col.label}</th>
+                                                <th key={col.key}>{col.label}</th>
                                             ))}
                                             {customColumns.map((col) => (
                                                 <th key={col.id}>{col.label}</th>
@@ -779,10 +860,8 @@ export default function PrintOptionsModal({
                                             return (
                                                 <tr key={emp.id || idx}>
                                                     {activeDataColumns.map((col) => (
-                                                        // SELECTIVE WRAPPING LOGIC APPLIED HERE
                                                         <td 
                                                             key={col.key} 
-                                                            className="font-battambang"
                                                             style={
                                                                 WRAP_COLUMNS.includes(col.key) 
                                                                 ? { whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: '250px' } 
